@@ -1,0 +1,203 @@
+<!-- Cognitive Bias Library Home -->
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cognitive Bias Library Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1337ec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101322",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<!-- Mobile Screen Container -->
+<div class="max-w-md mx-auto min-h-screen flex flex-col relative overflow-hidden bg-background-light dark:bg-background-dark">
+<!-- Header & Search -->
+<header class="px-5 pt-8 pb-4 sticky top-0 z-30 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md">
+<div class="flex justify-between items-center mb-6">
+<div>
+<h1 class="text-2xl font-bold tracking-tight">Library</h1>
+<p class="text-sm text-slate-500 dark:text-slate-400">Discover your mind's shortcuts.</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+<span class="material-icons-round text-primary text-2xl">account_circle</span>
+</div>
+</div>
+<div class="relative group">
+<span class="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+<input class="w-full bg-slate-200/50 dark:bg-slate-800/50 border-none rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 transition-all outline-none" placeholder="Search biases, effects, or heuristics..." type="text"/>
+</div>
+</header>
+<!-- Main Content Scroll Area -->
+<main class="flex-1 px-5 pb-24 overflow-y-auto">
+<!-- Bias of the Day -->
+<section class="mb-8">
+<div class="relative rounded-xl overflow-hidden bg-primary p-6 text-white shadow-xl shadow-primary/20">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-icons-round text-8xl">psychology</span>
+</div>
+<div class="relative z-10">
+<span class="inline-block px-2 py-1 rounded bg-white/20 text-[10px] font-bold uppercase tracking-wider mb-3">Bias of the Day</span>
+<h2 class="text-xl font-bold mb-2">The Dunning-Kruger Effect</h2>
+<p class="text-sm text-white/80 leading-relaxed mb-4">A cognitive bias where people with limited competence in a particular domain overestimate their abilities.</p>
+<button class="bg-white text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+                            Deep Dive
+                            <span class="material-icons-round text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Categories Horizontal Scroll -->
+<section class="mb-8">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-semibold text-lg">Categories</h3>
+<button class="text-xs text-primary font-medium">View All</button>
+</div>
+<div class="flex gap-3 overflow-x-auto hide-scrollbar -mx-5 px-5">
+<button class="flex-none px-5 py-2 rounded-full bg-primary text-white text-sm font-medium">All</button>
+<button class="flex-none px-5 py-2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium">Social</button>
+<button class="flex-none px-5 py-2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium">Decision-making</button>
+<button class="flex-none px-5 py-2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium">Memory</button>
+<button class="flex-none px-5 py-2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium">Financial</button>
+</div>
+</section>
+<!-- Bias Feed -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-semibold text-lg">Explore Biases</h3>
+<div class="flex items-center gap-1 text-slate-400">
+<span class="material-icons-round text-lg">sort</span>
+<span class="text-xs font-medium">Popular</span>
+</div>
+</div>
+<div class="space-y-4">
+<!-- Card 1 -->
+<div class="group p-4 rounded-xl bg-white dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex gap-4 items-start active:scale-[0.98] transition-all">
+<div class="w-16 h-16 rounded-lg bg-indigo-500/10 dark:bg-indigo-500/20 flex-shrink-0 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover opacity-80" data-alt="Abstract geometric brain pattern in blue" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAea_q8Vy-NOAOwXM4ofrm5eHZww9ata0oFj79QcXzVQzD7o6GuqD9v3k0IRMix1oXQi1Me-E_6H_gIsjx6z43uIN70wEd0_LVev_jvUUET2xriB-u1MRQ_wLW_76g6BPe52XqrrGQJWD8DdgVtyZi9PLiiDTIBi0pBoI9xkTMxysp7RyjeoWcu9wKnx6mAmewz8BD5RLDqQ-4RA77yoapUkrnJxB1D2UzfeQkS-shRD0sGsNEfbiv9L4f17V_ujBqiYVTgG4gb4rTH"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Decision-making</span>
+<span class="material-icons-round text-slate-300 dark:text-slate-600 text-sm">bookmark_border</span>
+</div>
+<h4 class="font-bold text-base mb-1">Confirmation Bias</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">The tendency to search for, interpret, favor, and recall information in a way that confirms one's prior beliefs.</p>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="group p-4 rounded-xl bg-white dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex gap-4 items-start active:scale-[0.98] transition-all">
+<div class="w-16 h-16 rounded-lg bg-amber-500/10 dark:bg-amber-500/20 flex-shrink-0 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover opacity-80" data-alt="Abstract golden anchor or weight representation" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9DFjtK95UsrCZ2W6gfZFo0XxJYKgiNJlOu0vv7N7g0vI93NHoaatKf9KFjs1nZBHxU5_J7Du29tCbQ9J5iDGLh2U6z-ikV3YC6NX-m8ya5NLitZKKuMLcK8BrKqy3EhoDRJ72UrQyxhDzEiDOPe9qmtfVpbn0_dmJnC5TAirTtbYDAlnHh51yo23oC0dp6aHe8HM7Gt9cFlrVu7IWj2Z_gD4jCGM5-UQVbhieM50yNlHZwO4BkqksvXjXc2t0bkCPSSkmYoBtnjZD"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-1">Heuristics</span>
+<span class="material-icons-round text-slate-300 dark:text-slate-600 text-sm">bookmark_border</span>
+</div>
+<h4 class="font-bold text-base mb-1">Anchoring Effect</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">The cognitive bias where an individual relies too heavily on an initial piece of information offered.</p>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="group p-4 rounded-xl bg-white dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex gap-4 items-start active:scale-[0.98] transition-all">
+<div class="w-16 h-16 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 flex-shrink-0 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover opacity-80" data-alt="Crowd silhouette abstract social pattern" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDn8GoFx9nSOVyOz6E8L5lXZPAlMONVm4-cEqmAKOwlUwh1iKjODFZ8PwLT6z3-nV6Ss9BGS4_mOiR_iiFS3BG9duI-oMu7_P5Qa_YnaxJy1sHAdYThFdKxATm0TXFBZsu_Xwdc2SlFKSBhEirBt03kqwPq6RoohVEpiDhPUfn9nLP5pa2EeJswcbOeKEqxFxY5pAYyGqF0-nss9CNJojSDf5Z8BUUgdACm2xRL_M__qKygHJP303e7D1fQE9KdEz1v5-knTslHKS_X"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Social</span>
+<span class="material-icons-round text-slate-300 dark:text-slate-600 text-sm">bookmark_border</span>
+</div>
+<h4 class="font-bold text-base mb-1">Bandwagon Effect</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">The phenomenon where the rate of uptake of beliefs, ideas, and trends increases the more they have been adopted.</p>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="group p-4 rounded-xl bg-white dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex gap-4 items-start active:scale-[0.98] transition-all">
+<div class="w-16 h-16 rounded-lg bg-rose-500/10 dark:bg-rose-500/20 flex-shrink-0 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover opacity-80" data-alt="Abstract red financial falling coin motif" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrs2wd8DCojOKmhvSaA4NSC_HoqvTffOLxttU7KnXO_SeJzMljRoQhu_Nt8qR_N-PWMbTVqV5wY9nAXs-0l0VMQAyx3K_RJhC0wGcRoh616v3J1LZoFuCrdokdTd3bxNvhKUA4qSc793cUpmR2n9TGAhir3pjrnf5c9HexUuKGh_YNrYytI_RkVlW9SF4aE6ZtO06tHZrjnGg1E0b55dZ38XN6pBQIRz10nJB4I-epLPBPbqsPdZZnzD_zvTfM8XZQEe9tpMSHbB_G"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-1">Financial</span>
+<span class="material-icons-round text-slate-300 dark:text-slate-600 text-sm">bookmark_border</span>
+</div>
+<h4 class="font-bold text-base mb-1">Sunk Cost Fallacy</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">Continuing an endeavor as a result of previously invested resources (time, money, or effort).</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Navigation Bar -->
+<nav class="absolute bottom-0 left-0 right-0 px-8 py-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex justify-between items-center z-40">
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-icons-round text-2xl">home</span>
+<span class="text-[10px] font-bold">Home</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500">
+<span class="material-icons-round text-2xl">bookmarks</span>
+<span class="text-[10px] font-medium">Saved</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500">
+<div class="w-12 h-12 -mt-8 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/40 text-white">
+<span class="material-icons-round text-3xl">lightbulb</span>
+</div>
+<span class="text-[10px] font-medium">Daily Quiz</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500">
+<span class="material-icons-round text-2xl">analytics</span>
+<span class="text-[10px] font-medium">Progress</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500">
+<span class="material-icons-round text-2xl">settings</span>
+<span class="text-[10px] font-medium">Settings</span>
+</button>
+</nav>
+<!-- iOS Home Indicator -->
+<div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-32 h-1 bg-slate-300 dark:bg-slate-700 rounded-full z-50"></div>
+</div>
+</body></html>

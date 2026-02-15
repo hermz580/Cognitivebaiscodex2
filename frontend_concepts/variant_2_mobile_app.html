@@ -1,0 +1,297 @@
+<!-- Cognitive Bias Library - Mobile Variant -->
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Cognitive Bias Library - Mobile App</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#4b2bee",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#131022",
+                        // Custom category colors derived/harmonized
+                        "accent-teal": "#2beeb4",
+                        "accent-pink": "#ee2b65",
+                        "accent-yellow": "#eece2b",
+                        "accent-blue": "#2bcee",
+                    },
+                    fontFamily: {
+                        "display": ["Lexend", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Custom scrollbar hiding for clean horizontal scrolls */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark font-display text-slate-800 dark:text-white min-h-screen flex justify-center selection:bg-primary selection:text-white">
+    <!-- Mobile Container -->
+    <div
+        class="w-full max-w-md bg-background-light dark:bg-background-dark min-h-screen relative shadow-2xl overflow-hidden flex flex-col">
+        <!-- Header Section -->
+        <header class="pt-8 pb-4 px-6 flex flex-col gap-4 z-10">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Good Morning, Alex</p>
+                    <h1 class="text-2xl font-bold tracking-tight">Sharpen your mind</h1>
+                </div>
+                <button
+                    class="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-100 dark:border-slate-700">
+                    <img alt="User Profile" class="w-10 h-10 rounded-full object-cover" data-alt="User profile avatar"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDAM0PQtBXPJ6xnIQVSixH3dv7z_w_xSrZlixrdbXHMCR35hP_JvFTgbWm_uPN6urzFvLw6UJscC7TgUVg5lhG4-OsrFdgttyCiBBPkBqqMUd4DrLqGi9RY7TPrH0CuV5qU_YNm5smC1YAz19AhKw4b5oJv4qFbIpF2DtBaMIIQGUJpuWR3DpGhVegAPxdPDfZKLm5S1wyRrnavIMcKHGKjh1AoVRlbqkXgldOOLqF3kwiHAFaxbcKtrvzhcg0XdbbkymBPHSJoULPZ" />
+                </button>
+            </div>
+            <!-- Search Bar -->
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span
+                        class="material-icons-round text-slate-400 group-focus-within:text-primary transition-colors">search</span>
+                </div>
+                <input
+                    class="w-full pl-12 pr-4 py-4 bg-white dark:bg-slate-800/50 border-none ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary rounded-full shadow-sm text-sm placeholder-slate-400 transition-all outline-none"
+                    placeholder="Search for biases, effects..." type="text" />
+            </div>
+        </header>
+        <!-- Main Content Scroll Area -->
+        <main class="flex-1 overflow-y-auto hide-scrollbar pb-28 px-6 space-y-8">
+            <!-- Bias of the Day Card -->
+            <section>
+                <div class="flex justify-between items-end mb-4">
+                    <h2 class="text-lg font-bold">Bias of the Day</h2>
+                    <span
+                        class="text-xs font-semibold uppercase tracking-wider text-primary/80 dark:text-primary/60">Daily
+                        Pick</span>
+                </div>
+                <div
+                    class="relative w-full rounded-lg overflow-hidden group cursor-pointer shadow-lg shadow-primary/20">
+                    <!-- Vibrant Gradient Background -->
+                    <div
+                        class="absolute inset-0 bg-gradient-to-br from-primary via-[#6d4bf5] to-accent-pink opacity-90 transition-transform duration-500 group-hover:scale-105">
+                    </div>
+                    <!-- Abstract Pattern Overlay -->
+                    <div class="absolute inset-0 opacity-20"
+                        style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 24px 24px;">
+                    </div>
+                    <div class="relative p-6 flex flex-col h-full justify-between min-h-[200px]">
+                        <div class="flex justify-between items-start">
+                            <span
+                                class="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold text-white border border-white/10">
+                                Social Category
+                            </span>
+                            <button class="text-white/70 hover:text-white transition-colors">
+                                <span class="material-icons-round">bookmark_border</span>
+                            </button>
+                        </div>
+                        <div class="mt-8">
+                            <h3 class="text-3xl font-extrabold text-white mb-2 leading-tight">The Halo Effect</h3>
+                            <p class="text-white/90 text-sm font-light leading-relaxed mb-4">
+                                Our tendency to let one positive trait guide our total opinion of a person, product, or
+                                company.
+                            </p>
+                            <div
+                                class="flex items-center gap-2 text-white font-medium text-sm group-hover:underline decoration-accent-yellow decoration-2 underline-offset-4">
+                                <span>Learn now</span>
+                                <span class="material-icons-round text-lg">arrow_forward</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Decorative Circle -->
+                    <div
+                        class="absolute -bottom-10 -right-10 w-40 h-40 bg-accent-yellow blur-3xl opacity-30 rounded-full pointer-events-none">
+                    </div>
+                </div>
+            </section>
+            <!-- Categories Grid -->
+            <section>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold">Explore Categories</h2>
+                    <button class="text-sm text-primary font-medium hover:text-primary/80">View all</button>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- Decision Making -->
+                    <button
+                        class="relative p-5 bg-slate-100 dark:bg-slate-800 rounded-lg flex flex-col items-start gap-3 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-accent-teal/20 flex items-center justify-center text-accent-teal group-hover:bg-accent-teal group-hover:text-slate-900 transition-all duration-300">
+                            <span class="material-icons-round">account_tree</span>
+                        </div>
+                        <span class="font-bold text-slate-800 dark:text-slate-100">Decision Making</span>
+                    </button>
+                    <!-- Social -->
+                    <button
+                        class="relative p-5 bg-slate-100 dark:bg-slate-800 rounded-lg flex flex-col items-start gap-3 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-accent-pink/20 flex items-center justify-center text-accent-pink group-hover:bg-accent-pink group-hover:text-white transition-all duration-300">
+                            <span class="material-icons-round">groups</span>
+                        </div>
+                        <span class="font-bold text-slate-800 dark:text-slate-100">Social</span>
+                    </button>
+                    <!-- Memory -->
+                    <button
+                        class="relative p-5 bg-slate-100 dark:bg-slate-800 rounded-lg flex flex-col items-start gap-3 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-accent-yellow/20 flex items-center justify-center text-accent-yellow group-hover:bg-accent-yellow group-hover:text-slate-900 transition-all duration-300">
+                            <span class="material-icons-round">psychology</span>
+                        </div>
+                        <span class="font-bold text-slate-800 dark:text-slate-100">Memory</span>
+                    </button>
+                    <!-- Belief -->
+                    <button
+                        class="relative p-5 bg-slate-100 dark:bg-slate-800 rounded-lg flex flex-col items-start gap-3 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors group">
+                        <div
+                            class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                            <span class="material-icons-round">visibility</span>
+                        </div>
+                        <span class="font-bold text-slate-800 dark:text-slate-100">Belief</span>
+                    </button>
+                </div>
+            </section>
+            <!-- Popular List -->
+            <section>
+                <h2 class="text-lg font-bold mb-4">Trending Now</h2>
+                <div class="flex flex-col gap-3">
+                    <!-- Card 1 -->
+                    <div
+                        class="p-4 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-between shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-slate-100 dark:border-slate-700/50">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 rounded-full bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center shrink-0">
+                                <span class="material-icons-round text-slate-500 dark:text-slate-300">anchor</span>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-800 dark:text-white">Anchoring Bias</h4>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span
+                                        class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-accent-teal text-slate-900">
+                                        Decision
+                                    </span>
+                                    <span class="text-xs text-slate-500">2 min read</span>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="material-icons-round text-slate-400">chevron_right</span>
+                    </div>
+                    <!-- Card 2 -->
+                    <div
+                        class="p-4 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-between shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-slate-100 dark:border-slate-700/50">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 rounded-full bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center shrink-0">
+                                <span
+                                    class="material-icons-round text-slate-500 dark:text-slate-300">check_circle</span>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-800 dark:text-white">Confirmation Bias</h4>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span
+                                        class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-primary text-white">
+                                        Belief
+                                    </span>
+                                    <span class="text-xs text-slate-500">4 min read</span>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="material-icons-round text-slate-400">chevron_right</span>
+                    </div>
+                    <!-- Card 3 -->
+                    <div
+                        class="p-4 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-between shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-slate-100 dark:border-slate-700/50">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 rounded-full bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center shrink-0">
+                                <span class="material-icons-round text-slate-500 dark:text-slate-300">school</span>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-800 dark:text-white">Dunning-Kruger Effect</h4>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span
+                                        class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-accent-pink text-white">
+                                        Social
+                                    </span>
+                                    <span class="text-xs text-slate-500">3 min read</span>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="material-icons-round text-slate-400">chevron_right</span>
+                    </div>
+                    <!-- Card 4 -->
+                    <div
+                        class="p-4 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-between shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-slate-100 dark:border-slate-700/50">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 rounded-full bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center shrink-0">
+                                <span class="material-icons-round text-slate-500 dark:text-slate-300">trending_up</span>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-800 dark:text-white">Recency Bias</h4>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span
+                                        class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-accent-yellow text-slate-900">
+                                        Memory
+                                    </span>
+                                    <span class="text-xs text-slate-500">1 min read</span>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="material-icons-round text-slate-400">chevron_right</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+        <!-- Bottom Navigation -->
+        <div class="absolute bottom-6 left-0 right-0 px-6 z-20 flex justify-center">
+            <nav
+                class="bg-white/80 dark:bg-slate-800/90 backdrop-blur-xl border border-white/20 dark:border-slate-700 shadow-2xl rounded-full px-6 py-4 flex items-center justify-between w-full max-w-xs ring-1 ring-black/5 dark:ring-white/10">
+                <button class="flex flex-col items-center gap-1 text-primary">
+                    <span class="material-icons-round text-2xl">home_filled</span>
+                </button>
+                <button
+                    class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary transition-colors">
+                    <span class="material-icons-round text-2xl">search</span>
+                </button>
+                <button
+                    class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary transition-colors">
+                    <span class="material-icons-round text-2xl">bookmark</span>
+                </button>
+                <button
+                    class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary transition-colors">
+                    <span class="material-icons-round text-2xl">person</span>
+                </button>
+            </nav>
+        </div>
+    </div>
+</body>
+
+</html>

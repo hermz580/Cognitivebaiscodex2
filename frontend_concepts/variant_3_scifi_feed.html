@@ -1,0 +1,420 @@
+<!-- Cognitive Bias Library - Tech Variant -->
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Cognitive Bias Library - Tech Variant</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Theme Config -->
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1337ec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101322",
+                        "surface-dark": "#171b2f",
+                        "surface-glass": "rgba(23, 27, 47, 0.7)",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.375rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    backdropBlur: {
+                        'xs': '2px',
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Hide scrollbar for clean horizontal scrolling */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Glassmorphism utilities */
+        .glass-panel {
+            background: rgba(16, 19, 34, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card {
+            background: linear-gradient(145deg, rgba(23, 27, 47, 0.6) 0%, rgba(16, 19, 34, 0.8) 100%);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Neon glow utility */
+        .neon-text {
+            text-shadow: 0 0 10px rgba(19, 55, 236, 0.5);
+        }
+
+        .neon-border {
+            box-shadow: 0 0 0 1px rgba(19, 55, 236, 0.3);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-200 font-display antialiased selection:bg-primary selection:text-white">
+    <!-- Mobile Container -->
+    <div class="max-w-md mx-auto min-h-screen relative flex flex-col pb-20 overflow-hidden">
+        <!-- Abstract Background Glow -->
+        <div
+            class="fixed top-[-10%] left-[-20%] w-[80%] h-[40%] rounded-full bg-primary/20 blur-[100px] pointer-events-none z-0">
+        </div>
+        <div
+            class="fixed bottom-[-10%] right-[-20%] w-[60%] h-[40%] rounded-full bg-primary/10 blur-[80px] pointer-events-none z-0">
+        </div>
+        <!-- Sticky Glass Header -->
+        <header class="sticky top-0 z-50 glass-panel px-5 pt-12 pb-4 rounded-b-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h1 class="text-xs font-bold tracking-widest uppercase text-primary mb-1 neon-text">Library V.3.0
+                    </h1>
+                    <h2 class="text-xl font-bold text-white tracking-tight">Cognitive Biases</h2>
+                </div>
+                <div class="relative">
+                    <span class="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                    <button class="p-2 rounded-full hover:bg-white/5 transition-colors text-white/80">
+                        <span class="material-icons-round">notifications_none</span>
+                    </button>
+                </div>
+            </div>
+            <!-- Integrated Search Bar -->
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span
+                        class="material-icons-round text-primary group-focus-within:text-white transition-colors">search</span>
+                </div>
+                <input
+                    class="block w-full pl-10 pr-3 py-2.5 border-none rounded-lg leading-5 bg-white/5 text-white placeholder-slate-400 focus:outline-none focus:bg-white/10 focus:ring-1 focus:ring-primary/50 sm:text-sm transition-all shadow-inner"
+                    placeholder="Search 188 biases..." type="text" />
+                <div class="absolute inset-y-0 right-0 pr-2 flex items-center">
+                    <kbd
+                        class="hidden sm:inline-block border border-slate-600 rounded px-1 text-xs font-mono text-slate-400">⌘K</kbd>
+                    <button class="p-1 text-slate-400 hover:text-white sm:hidden">
+                        <span class="material-icons-round text-lg">tune</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+        <!-- Main Content Area -->
+        <main class="flex-1 px-4 pt-4 relative z-10 space-y-6">
+            <!-- Quick Stats / HUD -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="glass-card p-3 rounded-lg flex items-center space-x-3">
+                    <div class="p-2 rounded-md bg-primary/20 text-primary">
+                        <span class="material-icons-round text-lg">analytics</span>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Tracked</div>
+                        <div class="text-lg font-bold text-white">188 <span
+                                class="text-xs font-normal text-slate-500">total</span></div>
+                    </div>
+                </div>
+                <div class="glass-card p-3 rounded-lg flex items-center space-x-3">
+                    <div class="p-2 rounded-md bg-emerald-500/20 text-emerald-400">
+                        <span class="material-icons-round text-lg">trending_up</span>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Most Active</div>
+                        <div class="text-lg font-bold text-white">Social <span
+                                class="text-xs font-normal text-slate-500">cat.</span></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Category Filter Scroll -->
+            <div>
+                <div class="flex space-x-2 overflow-x-auto no-scrollbar pb-2">
+                    <button
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full bg-primary text-white text-xs font-medium border border-primary shadow-[0_0_10px_rgba(19,55,236,0.4)]">
+                        All Data
+                    </button>
+                    <button
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium border border-white/10 transition-colors">
+                        Decision Making
+                    </button>
+                    <button
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium border border-white/10 transition-colors">
+                        Social &amp; Memory
+                    </button>
+                    <button
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium border border-white/10 transition-colors">
+                        Belief
+                    </button>
+                    <button
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium border border-white/10 transition-colors">
+                        Probability
+                    </button>
+                </div>
+            </div>
+            <!-- Bias List -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-end px-1">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-slate-500">Top Index</h3>
+                    <button class="text-xs text-primary hover:text-primary/80 flex items-center">
+                        Sort by Impact <span class="material-icons-round text-sm ml-1">sort</span>
+                    </button>
+                </div>
+                <!-- Card 1: Confirmation Bias -->
+                <article
+                    class="glass-card rounded-xl p-4 relative overflow-hidden group hover:border-primary/40 transition-colors">
+                    <div
+                        class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-3xl">
+                    </div>
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span
+                                    class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/20">BELIEF</span>
+                                <span class="text-[10px] text-slate-500 font-mono">ID: 042</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white group-hover:text-primary transition-colors">
+                                Confirmation Bias</h3>
+                        </div>
+                        <!-- Sparkline SVG -->
+                        <div class="text-right">
+                            <div class="text-[10px] uppercase text-slate-500 font-semibold mb-1 text-right">Frequency
+                            </div>
+                            <svg fill="none" height="20" viewbox="0 0 60 20" width="60"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 15L10 12L20 16L30 8L40 10L50 4L59 2" stroke="#1337ec" stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"></path>
+                                <path d="M1 15L10 12L20 16L30 8L40 10L50 4L59 2V20H1V15Z" fill="url(#grad1)"
+                                    opacity="0.3"></path>
+                                <defs>
+                                    <lineargradient gradientunits="userSpaceOnUse" id="grad1" x1="30" x2="30" y1="2"
+                                        y2="20">
+                                        <stop stop-color="#1337ec"></stop>
+                                        <stop offset="1" stop-color="#1337ec" stop-opacity="0"></stop>
+                                    </lineargradient>
+                                </defs>
+                            </svg>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-400 mb-4 line-clamp-2 leading-relaxed">
+                        The tendency to search for, interpret, favor, and recall information in a way that confirms or
+                        supports one's prior beliefs or values.
+                    </p>
+                    <div class="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
+                        <div class="flex space-x-4 text-xs font-mono text-slate-500">
+                            <span class="flex items-center"><span
+                                    class="w-1.5 h-1.5 rounded-full bg-red-500 mr-2"></span>High Impact</span>
+                            <span class="flex items-center"><span
+                                    class="w-1.5 h-1.5 rounded-full bg-primary mr-2"></span>Common</span>
+                        </div>
+                        <button class="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                            <span class="material-icons-round text-lg">bookmark_border</span>
+                        </button>
+                    </div>
+                </article>
+                <!-- Card 2: Dunning-Kruger Effect -->
+                <article
+                    class="glass-card rounded-xl p-4 relative overflow-hidden group hover:border-primary/40 transition-colors">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span
+                                    class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-500/20 text-purple-400 border border-purple-500/20">SELF</span>
+                                <span class="text-[10px] text-slate-500 font-mono">ID: 089</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white group-hover:text-primary transition-colors">
+                                Dunning-Kruger Effect</h3>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] uppercase text-slate-500 font-semibold mb-1 text-right">Impact</div>
+                            <svg fill="none" height="20" viewbox="0 0 60 20" width="60"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 18L15 15L25 10L35 12L45 5L59 1" stroke="#a855f7" stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"></path>
+                                <path d="M1 18L15 15L25 10L35 12L45 5L59 1V20H1V18Z" fill="url(#grad2)" opacity="0.3">
+                                </path>
+                                <defs>
+                                    <lineargradient gradientunits="userSpaceOnUse" id="grad2" x1="30" x2="30" y1="1"
+                                        y2="20">
+                                        <stop stop-color="#a855f7"></stop>
+                                        <stop offset="1" stop-color="#a855f7" stop-opacity="0"></stop>
+                                    </lineargradient>
+                                </defs>
+                            </svg>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-400 mb-4 line-clamp-2 leading-relaxed">
+                        A cognitive bias whereby people with low ability, expertise, or experience regarding a certain
+                        type of task or area of knowledge overestimate their ability.
+                    </p>
+                    <div class="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
+                        <div class="flex space-x-4 text-xs font-mono text-slate-500">
+                            <span class="flex items-center"><span
+                                    class="w-1.5 h-1.5 rounded-full bg-yellow-500 mr-2"></span>Med Impact</span>
+                            <span class="flex items-center"><span
+                                    class="w-1.5 h-1.5 rounded-full bg-primary mr-2"></span>Common</span>
+                        </div>
+                        <button class="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                            <span class="material-icons-round text-lg">bookmark_border</span>
+                        </button>
+                    </div>
+                </article>
+                <!-- Card 3: Anchoring Bias -->
+                <article
+                    class="glass-card rounded-xl p-4 relative overflow-hidden group hover:border-primary/40 transition-colors">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span
+                                    class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-400 border border-cyan-500/20">DECISION</span>
+                                <span class="text-[10px] text-slate-500 font-mono">ID: 012</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white group-hover:text-primary transition-colors">
+                                Anchoring Bias</h3>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] uppercase text-slate-500 font-semibold mb-1 text-right">Prevalence
+                            </div>
+                            <div class="flex items-end h-5 space-x-1 justify-end">
+                                <div class="w-1.5 bg-primary/30 h-[40%] rounded-sm"></div>
+                                <div class="w-1.5 bg-primary/50 h-[60%] rounded-sm"></div>
+                                <div class="w-1.5 bg-primary/70 h-[30%] rounded-sm"></div>
+                                <div class="w-1.5 bg-primary h-[80%] rounded-sm"></div>
+                                <div class="w-1.5 bg-primary/50 h-[50%] rounded-sm"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-400 mb-4 line-clamp-2 leading-relaxed">
+                        The common human tendency to rely too heavily on the first piece of information offered (the
+                        "anchor") when making decisions.
+                    </p>
+                    <div class="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
+                        <div class="flex space-x-4 text-xs font-mono text-slate-500">
+                            <span class="flex items-center"><span
+                                    class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></span>Low Impact</span>
+                            <span class="flex items-center"><span
+                                    class="w-1.5 h-1.5 rounded-full bg-primary mr-2"></span>Frequent</span>
+                        </div>
+                        <button class="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                            <span class="material-icons-round text-lg">bookmark_border</span>
+                        </button>
+                    </div>
+                </article>
+                <!-- Card 4: Sunk Cost Fallacy -->
+                <article
+                    class="glass-card rounded-xl p-4 relative overflow-hidden group hover:border-primary/40 transition-colors">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span
+                                    class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-rose-500/20 text-rose-400 border border-rose-500/20">LOGIC</span>
+                                <span class="text-[10px] text-slate-500 font-mono">ID: 077</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white group-hover:text-primary transition-colors">Sunk
+                                Cost Fallacy</h3>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] uppercase text-slate-500 font-semibold mb-1 text-right">Loss</div>
+                            <svg fill="none" height="20" viewbox="0 0 60 20" width="60"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 10C10 10 15 15 25 15C35 15 40 5 50 5C55 5 59 8 59 8" stroke="#f43f5e"
+                                    stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-400 mb-4 line-clamp-2 leading-relaxed">
+                        The phenomenon whereby a person is reluctant to abandon a strategy or course of action because
+                        they have invested heavily in it.
+                    </p>
+                    <div class="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
+                        <div class="flex space-x-4 text-xs font-mono text-slate-500">
+                            <span class="flex items-center"><span
+                                    class="w-1.5 h-1.5 rounded-full bg-red-500 mr-2"></span>High Impact</span>
+                            <span class="flex items-center"><span
+                                    class="w-1.5 h-1.5 rounded-full bg-primary mr-2"></span>Contextual</span>
+                        </div>
+                        <button class="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                            <span class="material-icons-round text-lg">bookmark_border</span>
+                        </button>
+                    </div>
+                </article>
+            </div>
+            <!-- Bottom Spacer -->
+            <div class="h-8"></div>
+        </main>
+        <!-- Bottom Navigation Bar -->
+        <nav class="fixed bottom-0 w-full max-w-md z-50 glass-panel border-t border-white/5 pb-6 pt-3 px-6">
+            <ul class="flex justify-between items-center">
+                <li>
+                    <a class="flex flex-col items-center group" href="#">
+                        <div class="relative p-1">
+                            <div class="absolute inset-0 bg-primary/30 blur-sm rounded-full opacity-50"></div>
+                            <span
+                                class="material-icons-round text-primary relative z-10 text-2xl group-hover:scale-110 transition-transform">home</span>
+                        </div>
+                        <span class="text-[10px] font-medium text-white mt-1">Library</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="flex flex-col items-center group" href="#">
+                        <span
+                            class="material-icons-round text-slate-500 text-2xl group-hover:text-slate-300 transition-colors">dashboard</span>
+                        <span
+                            class="text-[10px] font-medium text-slate-500 group-hover:text-slate-300 mt-1">Patterns</span>
+                    </a>
+                </li>
+                <li class="relative -top-5">
+                    <button
+                        class="w-12 h-12 rounded-full bg-primary shadow-[0_0_15px_rgba(19,55,236,0.6)] flex items-center justify-center text-white border border-white/20 hover:scale-105 transition-transform">
+                        <span class="material-icons-round text-xl">add</span>
+                    </button>
+                </li>
+                <li>
+                    <a class="flex flex-col items-center group" href="#">
+                        <span
+                            class="material-icons-round text-slate-500 text-2xl group-hover:text-slate-300 transition-colors">bookmarks</span>
+                        <span
+                            class="text-[10px] font-medium text-slate-500 group-hover:text-slate-300 mt-1">Saved</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="flex flex-col items-center group" href="#">
+                        <span
+                            class="material-icons-round text-slate-500 text-2xl group-hover:text-slate-300 transition-colors">settings</span>
+                        <span
+                            class="text-[10px] font-medium text-slate-500 group-hover:text-slate-300 mt-1">Settings</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</body>
+
+</html>
