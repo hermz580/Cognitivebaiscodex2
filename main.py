@@ -1,168 +1,217 @@
+
+# ── main.py ────────────────────────
+
 import csv
-import os
+import json
+import logging
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any, List, Optional
+
 import httpx
-from typing import List, Dict, Any, Optional
-from mcp.server.fastmcp import FastMCP
+import uvicorn
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
+from pydantic import BaseModel, Field
 
-# Initialize FastMCP server
-mcp = FastMCP("CognitiveBiasCodex")
+# --- Configure Logging (Strategy C) ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("mcp-server")
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "bias.csv")
 
-def load_data():
-    biases = []
-    if not os.path.exists(DATA_FILE):
+# --- Data Models ---
+class Bias(BaseModel):
+    """A single row in the master table."""
+    id: str
+    name: str = Field(..., description="Name of the cognitive bias")
+    category: str = Field(..., description="Broad category (e.g., Decision-making)")
+    subcategory: str = Field(default="", description="Optional sub-grouping")
+    url: str = Field(default="", description="Wikipedia or source URL")
+    wiki_summary: Optional[str] = Field(default=None, description="Enriched summary from Wikipedia")
+
+
+class PaginatedResponse(BaseModel):
+    """Standard pagination wrapper (Strategy B)."""
+    items: List[Bias]
+    page: int
+    size: int
+    total: int
+    total_pages: int
+
+
+# --- Global State & Caching (Strategy A) ---
+CSV_FILE = Path("bias.csv")
+_cached_biases: List[dict] = []
+_last_loaded: float = 0.0
+
+
+def load_csv() -> List[dict]:
+    """
+    Read `bias.csv` into a global in‑memory cache.
+    Adds a simple check to perform a reload only on startup or manual trigger.
+    """
+    global _cached_biases, _last_loaded
+    if not CSV_FILE.exists():
+        logger.error(f"CSV file not found at {CSV_FILE.absolute()}")
         return []
+
+    try:
+        with open(CSV_FILE, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            temp_list = []
+            for r in reader:
+                # Ensure all required fields exist with defaults
+                if "wiki_summary" not in r:
+                    r["wiki_summary"] = None
+                temp_list.append(r)
+            
+            _cached_biases = temp_list
+            _last_loaded = time.time()
+            logger.info(f"Loaded {len(_cached_biases)} records from CSV.")
+            return _cached_biases
+    except Exception as e:
+        logger.error(f"Failed to load CSV: {e}")
+        return []
+
+
+# --- Wikipedia Enrichment Helper ---
+async def fetch_wikipedia_summary(title_or_id: str, lang: str = "en") -> Optional[str]:
+    """
+    Fetch the summary paragraph from Wikipedia API.
+    Uses httpx for async non-blocking I/O.
+    """
+    if not title_or_id:
+        return None
         
-    with open(DATA_FILE, mode='r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            b_id = row.get('id', '')
-            if not b_id or b_id == 'bias':
-                continue
-            
-            parts = b_id.split('.')
-            # parts[0] is always 'bias'
-            category = parts[1] if len(parts) > 1 else ""
-            subcategory = parts[2] if len(parts) > 2 else ""
-            
-            # The name is the last part
-            name = parts[-1]
-            url = row.get('value', '').strip()
-            
-            biases.append({
-                "id": b_id,
-                "category": category,
-                "subcategory": subcategory,
-                "name": name,
-                "url": url,
-                "is_leaf": bool(url)
-            })
-    return biases
-
-@mcp.tool()
-def list_biases(category: Optional[str] = None) -> List[str]:
-    """
-    List all cognitive biases. 
-    Optionally filter by category.
-    """
-    data = load_data()
-    results = []
-    for b in data:
-        if b['is_leaf']:
-            if category:
-                if category.lower() in b['category'].lower():
-                    results.append(b['name'])
+    # Extract the title from the URL if needed, or assume ID is the title
+    clean_title = title_or_id.split("/")[-1] if "/" in title_or_id else title_or_id
+    
+    url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{clean_title}"
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("extract")
             else:
-                results.append(b['name'])
-    return sorted(list(set(results)))
+                logger.warning(f"Wikipedia fetch failed for '{clean_title}': {resp.status_code}")
+                return None
+    except Exception as e:
+        logger.error(f"Error fetching Wikipedia summary: {e}")
+        return None
 
-@mcp.tool()
-def get_bias_details(name: str) -> str:
-    """
-    Get the category, subcategory, and reference URL for a specific cognitive bias.
-    """
-    data = load_data()
-    for b in data:
-        if b['name'].lower() == name.lower() and b['is_leaf']:
-            res = f"Bias: {b['name']}\n"
-            res += f"Category: {b['category']}\n"
-            res += f"Subcategory: {b['subcategory']}\n"
-            res += f"Reference: {b['url']}"
-            return res
-    return f"Bias '{name}' not found."
 
-@mcp.tool()
-async def get_wiki_summary(name: str) -> str:
-    """
-    Fetch a brief summary of a cognitive bias from Wikipedia.
-    """
-    bias = None
-    data = load_data()
-    for b in data:
-        if b['name'].lower() == name.lower() and b['is_leaf']:
-            bias = b
-            break
-    
-    if not bias:
-        return f"Bias '{name}' not found."
-    
-    url = bias['url']
-    if "wikipedia.org" not in url:
-        return f"No Wikipedia URL available for '{name}'. Try: {url}"
-    
-    # Extract page title from URL
-    title = url.split("/wiki/")[-1]
-    api_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.get(api_url)
-            resp.raise_for_status()
-            wiki_data = resp.json()
-            return wiki_data.get('extract', 'No summary available.')
-        except Exception as e:
-            return f"Error fetching summary: {str(e)}"
+# --- App Lifecycle ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run startup and shutdown tasks (Strategy A - Cache Warming)."""
+    logger.info("Starting up MCP Server...")
+    load_csv()
+    yield
+    logger.info("Shutting down MCP Server...")
 
-@mcp.tool()
-def search_biases(query: str) -> List[Dict[str, str]]:
-    """
-    Search for biases matching a query string in their name or category.
-    """
-    data = load_data()
-    results = []
-    for b in data:
-        if b['is_leaf'] and (query.lower() in b['name'].lower() or query.lower() in b['category'].lower()):
-            results.append({
-                "name": b['name'],
-                "category": b['category'],
-                "url": b['url']
-            })
-    return results
 
-@mcp.tool()
-def get_categories() -> Dict[str, List[str]]:
-    """
-    Get all categories and their associated sub-themes.
-    """
-    data = load_data()
-    cats = {}
-    for b in data:
-        cat = b['category']
-        if not cat: continue
-        if cat not in cats:
-            cats[cat] = set()
-        if b['subcategory']:
-            cats[cat].add(b['subcategory'])
-    
-    return {k: sorted(list(v)) for k, v in cats.items()}
+# --- Build FastAPI App ---
+app = FastAPI(
+    title="Cognitive Bias Codex MCP",
+    description="A Model Context Protocol (MCP) server providing structured data on cognitive biases.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
-@mcp.resource("cognitive-bias://full-codex")
-def get_full_codex() -> str:
-    """Returns the full hierarchical data of the cognitive bias codex in Markdown format."""
-    data = load_data()
-    output = "# Cognitive Bias Codex\n\n"
+# Enable CORS (open by default for local development)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Instrumentation (Strategy G - Prometheus) ---
+Instrumentator().instrument(app).expose(app)
+
+
+# --- Endpoints ---
+
+@app.get("/search", response_model=PaginatedResponse, tags=["Biases"])
+async def search_biases(
+    term: Optional[str] = Query(None, description="Search term for name or category"),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Items per page"),
+    enrich: bool = Query(False, description="Fetch live Wikipedia summaries?")
+):
+    """
+    Search biases with pagination.
+    Strategy B: Standard offset pagination with metadata.
+    """
+    # 1. Filtering
+    results = _cached_biases
+    if term:
+        t = term.lower()
+        results = [
+            b for b in results 
+            if t in b.get("name", "").lower() or t in b.get("category", "").lower()
+        ]
     
-    tree = {}
-    for b in data:
-        cat = b['category']
-        sub = b['subcategory']
-        if not cat: continue
-        if cat not in tree: tree[cat] = {}
-        if sub not in tree[cat]: tree[cat][sub] = []
-        if b['is_leaf']:
-            tree[cat][sub].append(b)
-            
-    for cat, subs in tree.items():
-        output += f"## {cat}\n"
-        for sub, biases in subs.items():
-            if sub:
-                output += f"### {sub}\n"
-            for b in biases:
-                output += f"- [{b['name']}]({b['url']})\n"
-            output += "\n"
-    return output
+    # 2. Pagination Logic
+    total = len(results)
+    total_pages = (total + size - 1) // size
+    start = (page - 1) * size
+    end = start + size
+    paginated_items = results[start:end]
+
+    # 3. Optional Enrichment
+    final_items = []
+    for item in paginated_items:
+        # Clone dict to avoid mutating cache permanently with temp updates if needed
+        # (Though caching the summary would be smart, keeping it simple for now)
+        bias_obj = item.copy()
+        if enrich and not bias_obj.get("wiki_summary"):
+             # Fetch live if requested and empty
+             summary = await fetch_wikipedia_summary(bias_obj.get("url") or bias_obj.get("name"))
+             bias_obj["wiki_summary"] = summary
+        final_items.append(bias_obj)
+
+    return {
+        "items": final_items,
+        "page": page,
+        "size": size,
+        "total": total,
+        "total_pages": total_pages
+    }
+
+
+@app.get("/bias/{bias_id}", response_model=Bias, tags=["Biases"])
+async def get_bias_detail(bias_id: str):
+    """
+    Get a single bias by ID. Auto-enriches with Wikipedia data.
+    """
+    # Find record
+    record = next((b for b in _cached_biases if b.get("id") == bias_id), None)
+    
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Bias with ID '{bias_id}' not found.")
+
+    # Enrich on detail view
+    bias_obj = record.copy()
+    if not bias_obj.get("wiki_summary"):
+        summary = await fetch_wikipedia_summary(bias_obj.get("url") or bias_obj.get("name"))
+        bias_obj["wiki_summary"] = summary
+        
+    return bias_obj
+
+
+@app.get("/health", tags=["System"])
+def health_check():
+    """Simple health check endpoint."""
+    return {"status": "ok", "cached_records": len(_cached_biases)}
+
 
 if __name__ == "__main__":
-    mcp.run()
-
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
