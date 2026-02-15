@@ -1,4 +1,5 @@
 ## AgentITC – "Prom‑PT"  
+
 A one–page *Project Definition* (PDP) you can hand to a developer or PM to get the
 **Cognitive Bias Codex MCP** "up and running" as quickly & reliably as possible.  
 
@@ -25,8 +26,8 @@ id,name,category,subcategory,url,wiki_summary
 ```  
 
 * **API** – two GET endpoints.  
-    - `/search?term=…` → JSON array of all biases matching the query string.  
-    - `/bias/{id}` → single bias row (useful for a "detail view"). |
+  * `/search?term=…` → JSON array of all biases matching the query string.  
+  * `/bias/{id}` → single bias row (useful for a "detail view"). |
 
 * **Performance** – the first request to each endpoint must finish in < 200 ms on an ordinary laptop; subsequent requests should be ~< 100 ms (CSV caching).  
 
@@ -163,7 +164,7 @@ curl http://127.0.0.1:8080/search?term=confirmation
 > **How to test programmatically**
 
 ```bash
-$ pytest -q test_api.py           # → should report "2 passed"
+pytest -q test_api.py           # → should report "2 passed"
 ```
 
 ---
@@ -173,4 +174,78 @@ $ pytest -q test_api.py           # → should report "2 passed"
 * Add *pagination* (`page, size` query params) if you want large result sets.  
 * Create a tiny CI pipeline (GitHub Actions: `python-test.yml`).  
 
-The PDP above is all you need to get the MVP up and running – simply copy it into your repo, run tests, fix bugs that may pop out, then ship!
+---
+
+# 📚 Appendix: Technical FAQ & Architecture Decisions
+
+## A | Strategies for Data Sync
+
+| # | Strategy | What you get | Pros / cons |
+|---|----------|-----------|-----------|
+| **1** | *In‑memory cache loaded once* | The whole file is read only when the server starts. | Very fast; minimal usage of I/O. Best for small static datasets. |
+| **2** | *File‑watcher & refresh* | A background task reloads the file when it changes. | Keeps sync without restarts; adds complexity with threading/asyncio. |
+| **3** | *SQLite + ORM* | Import CSV to SQL. | Overkill for <1000 rows, but good for complex SQL queries. |
+
+**Decision**: We use **Strategy 1** for the MVP. It delivers the best performance-to-simplicity ratio.
+
+## B | Pagination Design
+
+We use standard offset-based pagination:
+
+* **`page`**: Default `1`
+* **`size`**: Default `20`
+
+Implementation:
+
+```python
+start = (page - 1) * size
+end = start + size
+return items[start:end]
+```
+
+## C | Observability (Logs & Metrics)
+
+* **Logs**: Standard Python `logging` with a JSON-friendly format.
+* **Metrics**: Prometheus counters via `prometheus_fastapi_instrumentator`.
+  * `bias_requests_total`: Counter
+  * `bias_search_latency_seconds`: Histogram
+
+## D | Authentication
+
+**Decision**: **None (Open)** for local MVP.
+
+* Why: MCP servers running on localhost typically rely on network isolation.
+* Future: If deployed, use a simple `Authorization: Bearer <token>` header check.
+
+## E | HTTP Client (httpx)
+
+**Decision**: **HTTPX**.
+
+* Why: Native async support, cleaner API than `requests`, and serves as both the app client (Wikipedia) and the test client (`FastAPI.TestClient`).
+
+## F | CI/CD Pipeline
+
+Recommended GitHub Actions workflow:
+
+1. **Checkout** code.
+2. **Install** python & dependencies.
+3. **Lint** (Ruff/Flake8).
+4. **Test** (pytest).
+
+## H | Serialization
+
+**Decision**: **`str`** for `wiki_summary`.
+
+* Why: JSON serialization of strings is native and fast. storing as bytes complicates the Pydantic model response unnecessarily for this use case.
+
+## I | SQLite Migration
+
+If data exceeds ~10,000 rows or requires complex relational queries (joins), migration to SQLite is recommended. A simple script can `pandas.read_csv("bias.csv").to_sql(...)` during the build process.
+
+## J | Extensibility
+
+To add fields (e.g., `google_search_url`):
+
+1. Add column to CSV header.
+2. Add field to Pydantic `Bias` model.
+3. Restart server (Strategy 1 loads it automatically).
