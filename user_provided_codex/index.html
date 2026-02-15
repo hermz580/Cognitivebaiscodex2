@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognitive Codex Mobile</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0b;
+            --text-color: #d4d4d8;
+            --card-bg: #18181b;
+            --accent-color: #8b5cf6;
+            --secondary-color: #52525b;
+            --border-radius: 12px;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            font-size: 16px;
+            line-height: 1.5;
+            padding: 20px;
+            padding-bottom: 80px;
+            /* Space for navbar */
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #fff;
+            text-align: center;
+        }
+
+        /* Search Bar */
+        .search-container {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 25px;
+            /* Pill shape */
+            border: none;
+            background-color: #27272a;
+            color: #fff;
+            font-size: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            outline: none;
+        }
+
+        input[type="text"]::placeholder {
+            color: #a1a1aa;
+        }
+
+        /* Tabs/Categories */
+        .tabs {
+            display: flex;
+            overflow-x: auto;
+            gap: 10px;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            scrollbar-width: none;
+            /* Hide scrollbar Firefox */
+        }
+
+        .tabs::-webkit-scrollbar {
+            display: none;
+            /* Hide scrollbar Chrome/Safari */
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background-color: #27272a;
+            border-radius: 20px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .tab.active {
+            background-color: var(--accent-color);
+            color: #fff;
+        }
+
+        /* List Layout */
+        .item-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Card Style */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            border: 1px solid #27272a;
+        }
+
+        .card:active {
+            transform: scale(0.98);
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+            color: #fff;
+        }
+
+        .card-subtitle {
+            font-size: 0.85rem;
+            color: #a1a1aa;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-details {
+            display: none;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #3f3f46;
+            font-size: 0.95rem;
+            color: #d4d4d8;
+        }
+
+        .card.expanded .card-details {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .detail-row {
+            margin-bottom: 8px;
+        }
+
+        .detail-label {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        /* Bottom Nav (Optional for future features) */
+        .bottom-nav {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #27272a;
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: flex;
+            gap: 20px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            color: #a1a1aa;
+            font-size: 1.5rem;
+            /* Emoji icons */
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Cognitive Codex</h1>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search Biases, Fallacies...">
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="filterType('All')">All</div>
+        <div class="tab" onclick="filterType('Bias')">Biases</div>
+        <div class="tab" onclick="filterType('Fallacy')">Fallacies</div>
+        <div class="tab" onclick="filterType('Mental Model')">Mental Models</div>
+    </div>
+
+    <div class="item-list" id="itemList">
+        <!-- Javascript will populate this -->
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" title="Home">🏠</div>
+        <div class="nav-item" title="Favorites">❤️</div>
+        <div class="nav-item" title="Settings">⚙️</div>
+    </div>
+
+    <script>
+        let allData = [];
+        let currentFilter = 'All';
+
+        // Load Data
+        async function loadData() {
+            try {
+                const [biasesRes, fallaciesRes, modelsRes] = await Promise.all([
+                    fetch('biases.json'),
+                    fetch('fallacies.json'),
+                    fetch('mental_models.json')
+                ]);
+
+                const biases = await biasesRes.json();
+                const fallacies = await fallaciesRes.json();
+                const models = await modelsRes.json();
+
+                // Normalize Data Structure
+                allData = [
+                    ...biases.map(b => ({
+                        type: 'Bias',
+                        name: b.name,
+                        subtitle: b.category,
+                        description: `Category: ${b.category} > ${b.subcategory}`,
+                        url: b.url,
+                        fullDetails: `External Link: <a href="${b.url}" target="_blank" style="color: #8b5cf6;">${b.url}</a>`
+                    })),
+                    ...fallacies.map(f => ({
+                        type: 'Fallacy',
+                        name: f.name,
+                        subtitle: 'Logical Fallacy',
+                        description: f.description,
+                        fullDetails: `<strong>Logical Form:</strong> ${f.logical_form || 'N/A'}<br><br><strong>Example:</strong> ${f.explanation_with_examples || 'N/A'}`
+                    })),
+                    ...models.map(m => ({
+                        type: 'Mental Model',
+                        name: m.name,
+                        subtitle: m.category,
+                        description: m.description,
+                        fullDetails: `<strong>Example:</strong> ${m.example || 'N/A'}`
+                    }))
+                ];
+
+                renderList();
+
+            } catch (error) {
+                console.error("Error loading data:", error);
+                document.getElementById('itemList').innerHTML = `<div class='card' style='color:red;'>Error loading data. Make sure you serve this via a local server (e.g. python -m http.server).</div>`;
+            }
+        }
+
+        // Render List based on Search and Filter
+        function renderList() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const listContainer = document.getElementById('itemList');
+            listContainer.innerHTML = '';
+
+            const filtered = allData.filter(item => {
+                const matchesType = currentFilter === 'All' || item.type === currentFilter;
+                const matchesSearch = item.name.toLowerCase().includes(query) ||
+                    (item.description && item.description.toLowerCase().includes(query));
+                return matchesType && matchesSearch;
+            });
+
+            filtered.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-title">${item.name}</div>
+                    <div class="card-subtitle">[${item.type}] ${item.subtitle}</div>
+                    <div class="card-description" style="font-size: 0.9em; color: #ccc;">${item.description ? item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '') : ''}</div>
+                    <div class="card-details">${item.fullDetails}</div>
+                `;
+
+                card.onclick = () => {
+                    item.expanded = !item.expanded;
+                    if (item.expanded) {
+                        card.classList.add('expanded');
+                    } else {
+                        card.classList.remove('expanded');
+                    }
+                };
+
+                listContainer.appendChild(card);
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('searchInput').addEventListener('input', renderList);
+
+        function filterType(type) {
+            currentFilter = type;
+            // Update UI tabs
+            document.querySelectorAll('.tab').forEach(t => {
+                t.classList.remove('active');
+                if (t.innerText.includes(type) || (type === 'All' && t.innerText === 'All')) {
+                    t.classList.add('active');
+                }
+            });
+            renderList();
+        }
+
+        // Search Bar Focus Effect (Optional)
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('focus', () => {
+            document.querySelector('.search-container').style.transform = 'scale(1.02)';
+        });
+        searchInput.addEventListener('blur', () => {
+            document.querySelector('.search-container').style.transform = 'scale(1)';
+        });
+
+        // Initialize
+        loadData();
+
+    </script>
+</body>
+
+</html>

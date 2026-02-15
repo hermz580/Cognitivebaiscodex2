@@ -1,0 +1,6 @@
+mcp
+pydantic
+python-dotenv
+httpx
+fastmcp
+beautifulsoup4
