@@ -5,16 +5,20 @@ import asyncio
 import csv
 import json
 import logging
+import os
 import random
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import anthropic
 import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
@@ -60,6 +64,26 @@ class StatsResponse(BaseModel):
     total_subcategories: int
     cached_summaries: int
     categories: List[CategoryStat]
+
+
+# --- AR Scanner Models ---
+class AnalyzeRequest(BaseModel):
+    image: str = Field(..., description="Base64-encoded image data (JPEG or PNG)")
+    media_type: str = Field(default="image/jpeg", description="MIME type: image/jpeg or image/png")
+
+
+class DetectedConcept(BaseModel):
+    name: str
+    reason: str
+    confidence: str  # "high" | "medium" | "low"
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    url: Optional[str] = None
+
+
+class AnalyzeResponse(BaseModel):
+    scene: str
+    detected: List[DetectedConcept]
 
 
 # --- Global State & Caching (Strategy A) ---
@@ -346,6 +370,180 @@ def health_check():
         "cached_records": len(_cached_biases),
         "cached_summaries": sum(1 for b in _cached_biases if b.get("wiki_summary")),
     }
+
+
+# --- AR Scanner ---
+
+_CLAUDE_SYSTEM_PROMPT = """You are a cognitive bias analyst with expertise in applied psychology.
+When shown an image, identify cognitive biases and logical fallacies that are VISUALLY EVIDENCED
+by specific elements you can see. Never speculate — only report what is directly visible.
+
+Common visual evidence patterns:
+- Sale prices with crossed-out originals → Anchoring Bias
+- "Only N left!", countdown timers → Scarcity Bias / Availability Heuristic
+- Celebrity or expert photos next to products → Appeal to Authority, Appeal to Celebrity
+- "9 out of 10 dentists..." / star ratings → Social Proof, Appeal to Common Belief
+- Before/after comparisons → Contrast Effect
+- Group of smiling, nodding people → Groupthink, Conformity Bias, Social Proof
+- Awards, certifications, badges → Authority Bias, Halo Effect
+- Headlines, news framing, social media feeds → Framing Effect, Confirmation Bias
+- "Natural", "Ancient", "100% proven" labels → Appeal to Nature, Alleged Certainty
+- Political imagery, flags, uniforms → In-group Bias, Appeal to Tradition
+- Identical choices at different price points → Decoy Effect
+
+Return ONLY a raw JSON object — no markdown, no code fences, no extra text:
+{
+  "scene": "1-2 sentence description of what you see",
+  "biases": [
+    {
+      "name": "Exact bias or fallacy name",
+      "reason": "The specific visual element and why it suggests this bias (1-2 sentences)",
+      "confidence": "high|medium|low"
+    }
+  ]
+}
+Maximum 5 biases. If nothing is clearly evidenced, return an empty "biases" array."""
+
+_ALLOWED_MEDIA_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+_MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MB base64 limit
+
+
+def _get_anthropic_client() -> anthropic.AsyncAnthropic:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="ANTHROPIC_API_KEY environment variable not set. "
+                   "Add it to your environment to enable AR scanning."
+        )
+    return anthropic.AsyncAnthropic(api_key=api_key)
+
+
+def _match_local_bias(name: str) -> Optional[dict]:
+    """Case-insensitive fuzzy match of a detected bias name against the local CSV data."""
+    name_lower = name.lower()
+    # Exact match first
+    for b in _cached_biases:
+        if b.get("name", "").lower() == name_lower:
+            return b
+    # Substring match
+    for b in _cached_biases:
+        if name_lower in b.get("name", "").lower() or b.get("name", "").lower() in name_lower:
+            return b
+    return None
+
+
+@app.post("/analyze", response_model=AnalyzeResponse, tags=["AR Scanner"])
+async def analyze_scene(req: AnalyzeRequest):
+    """
+    Analyze a base64-encoded camera frame for cognitive biases using Claude vision.
+
+    Pass a JPEG or PNG image captured from the device camera and receive a list
+    of detected cognitive biases with explanations matched against the local database.
+
+    Requires the `ANTHROPIC_API_KEY` environment variable to be set.
+    """
+    if req.media_type not in _ALLOWED_MEDIA_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported media_type '{req.media_type}'. "
+                   f"Allowed: {sorted(_ALLOWED_MEDIA_TYPES)}"
+        )
+
+    if len(req.image) > _MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Image too large. Compress or reduce resolution before sending."
+        )
+
+    client = _get_anthropic_client()
+
+    try:
+        response = await client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=1024,
+            system=_CLAUDE_SYSTEM_PROMPT,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": req.media_type,
+                            "data": req.image,
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "Analyze this image for cognitive biases. "
+                            "Return only the JSON object as described."
+                        ),
+                    },
+                ],
+            }],
+        )
+    except anthropic.BadRequestError as e:
+        raise HTTPException(status_code=400, detail=f"Image rejected by Claude: {e.message}")
+    except anthropic.AuthenticationError:
+        raise HTTPException(status_code=503, detail="Invalid ANTHROPIC_API_KEY.")
+    except Exception as e:
+        logger.error(f"Claude API error during /analyze: {e}")
+        raise HTTPException(status_code=503, detail="Analysis service temporarily unavailable.")
+
+    # Parse Claude's JSON response
+    raw_text = response.content[0].text.strip()
+    # Strip markdown code fences if present
+    if raw_text.startswith("```"):
+        raw_text = raw_text.split("```")[1]
+        if raw_text.startswith("json"):
+            raw_text = raw_text[4:]
+        raw_text = raw_text.strip()
+
+    try:
+        data = json.loads(raw_text)
+    except json.JSONDecodeError:
+        logger.error(f"/analyze: Could not parse Claude JSON: {raw_text[:200]}")
+        return AnalyzeResponse(scene="Scene analyzed.", detected=[])
+
+    # Enrich each detected bias with local database info
+    detected: List[DetectedConcept] = []
+    for item in data.get("biases", [])[:5]:
+        name = item.get("name", "").strip()
+        if not name:
+            continue
+        local = _match_local_bias(name)
+        detected.append(DetectedConcept(
+            name=name,
+            reason=item.get("reason", ""),
+            confidence=item.get("confidence", "medium"),
+            category=local.get("category") if local else None,
+            subcategory=local.get("subcategory") if local else None,
+            url=local.get("url") if local else None,
+        ))
+
+    return AnalyzeResponse(
+        scene=data.get("scene", ""),
+        detected=detected,
+    )
+
+
+# --- Camera UI ---
+
+@app.get("/", response_class=FileResponse, include_in_schema=False)
+async def serve_camera_ui():
+    """Serve the AR camera scanner UI."""
+    path = Path("static/index.html")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Camera UI not built yet.")
+    return FileResponse(path)
+
+
+# Mount static assets — must be AFTER all route definitions
+_static_dir = Path("static")
+if _static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 if __name__ == "__main__":
