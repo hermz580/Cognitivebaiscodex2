@@ -260,9 +260,12 @@
       if (data.ai_backend.includes("anthropic")) {
         badge.textContent = "vision AI ready";
         badge.style.color = "#10b981";
+      } else if (data.ai_backend.includes("huggingface")) {
+        badge.textContent = "HF cloud ready";
+        badge.style.color = "#f59e0b";
       } else {
         badge.textContent = "local LLM only";
-        badge.style.color = "#f59e0b";
+        badge.style.color = "#ef4444";
       }
     } catch (_) {}
   }
@@ -343,9 +346,12 @@
         list.appendChild(card);
       });
     }
-    document.getElementById("backendNote").textContent =
-      data.backend_used === "local_llm" ? "⚠ Text-only (local LLM — image not processed)"
-      : data.backend_used === "anthropic" ? "✓ Vision analysis via Anthropic Claude" : "";
+    const notes = {
+      anthropic:    "✓ Vision analysis via Anthropic Claude",
+      huggingface:  "⚠ Cloud text analysis via Hugging Face (image not processed)",
+      local_llm:    "⚠ Local text analysis (image not processed — home network only)",
+    };
+    document.getElementById("backendNote").textContent = notes[data.backend_used] || "";
     document.getElementById("scanResults").classList.remove("hidden");
   }
 

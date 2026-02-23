@@ -40,6 +40,14 @@ LOCAL_LLM_MODEL = os.getenv(
     "openai-gpt-oss-20b-abliterated-uncensored-neo-imatrix",
 )
 
+# Hugging Face Inference API
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
+HF_MODEL  = os.getenv(
+    "HF_MODEL",
+    "mistralai/Mistral-7B-Instruct-v0.3",
+)
+HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
 
@@ -297,8 +305,70 @@ async def _try_anthropic(image_b64: str, media_type: str) -> Optional[dict]:
         return None
 
 
+def _strip_json(raw: str) -> str:
+    """Strip markdown code fences and return raw JSON string."""
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    return raw
+
+
+def _tag_scene(parsed: dict, tag: str) -> dict:
+    """Prepend a notice to the scene field so the UI can warn the user."""
+    parsed["scene"] = tag + parsed.get("scene", "Common bias patterns identified.")
+    return parsed
+
+
+async def _try_huggingface() -> Optional[dict]:
+    """Call HF Inference API (text-only, cloud). Returns parsed dict or None."""
+    if not HF_TOKEN:
+        return None
+
+    prompt = (
+        f"[INST] {_SYSTEM_PROMPT}\n\n"
+        "Identify the top 3 cognitive biases most commonly found in advertisements "
+        "and marketing materials based on typical visual patterns. "
+        "Return ONLY the raw JSON object — no markdown, no explanation. [/INST]"
+    )
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 600,
+            "temperature": 0.3,
+            "return_full_text": False,
+        },
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                HF_API_URL,
+                json=payload,
+                headers={"Authorization": f"Bearer {HF_TOKEN}"},
+                timeout=45.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                raw = ""
+                if isinstance(data, list) and data:
+                    raw = data[0].get("generated_text", "")
+                elif isinstance(data, dict):
+                    raw = data.get("generated_text", "")
+                raw = _strip_json(raw)
+                if not raw:
+                    return None
+                parsed = json.loads(raw)
+                return _tag_scene(parsed, "[Cloud text analysis — image not processed] ")
+            logger.warning(f"HF API returned {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        logger.debug(f"HF API unavailable: {e}")
+    return None
+
+
 async def _try_local_llm() -> Optional[dict]:
-    """Call local LLM (text-only fallback). Returns parsed dict or None."""
+    """Call local LLM at localhost:1234 (text-only, home network). Returns parsed dict or None."""
     user_input = (
         "Identify the top 3 cognitive biases most commonly found in advertisements "
         "and marketing materials. Use your knowledge of typical visual patterns. "
@@ -314,7 +384,6 @@ async def _try_local_llm() -> Optional[dict]:
             resp = await client.post(LOCAL_LLM_URL, json=payload, timeout=30.0)
             if resp.status_code == 200:
                 data = resp.json()
-                # Handle various local LLM response shapes
                 raw = (
                     data.get("response")
                     or data.get("output")
@@ -322,32 +391,25 @@ async def _try_local_llm() -> Optional[dict]:
                     or data.get("message", {}).get("content", "")
                     or ""
                 )
+                raw = _strip_json(raw)
                 if not raw:
                     return None
-                raw = raw.strip()
-                if raw.startswith("```"):
-                    raw = raw.split("```")[1]
-                    if raw.startswith("json"):
-                        raw = raw[4:]
-                    raw = raw.strip()
                 parsed = json.loads(raw)
-                # Mark scene so user knows image was not analysed
-                parsed["scene"] = (
-                    "[Text-only analysis — image not processed] "
-                    + parsed.get("scene", "Common bias patterns identified.")
-                )
-                return parsed
+                return _tag_scene(parsed, "[Local text analysis — image not processed] ")
     except Exception as e:
         logger.debug(f"Local LLM unavailable: {e}")
     return None
 
 
 def _detect_ai_backend() -> str:
-    """Return a human-readable label for which backend is active."""
-    has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    if has_anthropic:
-        return "anthropic+local_fallback"
-    return "local_llm_only"
+    """Return a human-readable label for which backend(s) are configured."""
+    parts = []
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        parts.append("anthropic")
+    if HF_TOKEN:
+        parts.append("huggingface")
+    parts.append("local_llm")   # always attempted last
+    return "+".join(parts)
 
 
 # ── App lifecycle ─────────────────────────────────────────────────────────────
@@ -529,12 +591,19 @@ async def analyze_scene(req: AnalyzeRequest):
     backend_used = "none"
     data: Optional[dict] = None
 
-    # 1. Try Anthropic (vision)
+    # 1. Anthropic — real vision analysis (best, requires API key)
     data = await _try_anthropic(req.image, req.media_type)
     if data:
         backend_used = "anthropic"
-    else:
-        # 2. Try local LLM (text-only)
+
+    # 2. HF Inference API — cloud text fallback (requires HF_TOKEN, works anywhere)
+    if data is None:
+        data = await _try_huggingface()
+        if data:
+            backend_used = "huggingface"
+
+    # 3. Local LLM — home-network text fallback (no credentials needed)
+    if data is None:
         data = await _try_local_llm()
         if data:
             backend_used = "local_llm"
@@ -543,9 +612,10 @@ async def analyze_scene(req: AnalyzeRequest):
         raise HTTPException(
             status_code=503,
             detail=(
-                "No AI backend available. "
-                "Set ANTHROPIC_API_KEY for vision analysis, "
-                "or ensure local LLM is running at localhost:1234."
+                "No AI backend available. Options: "
+                "(1) Set ANTHROPIC_API_KEY for vision analysis; "
+                "(2) Set HF_TOKEN for Hugging Face cloud analysis; "
+                "(3) Run a local LLM at localhost:1234."
             ),
         )
 
@@ -589,4 +659,5 @@ if _static.exists():
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

@@ -1,79 +1,69 @@
-# Cognitive Bias Codex MCP
+---
+title: Cognitive Bias Codex
+emoji: 🧠
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
 
-A robust [Model Context Protocol (MCP)](https://www.anthropic.com/index/model-context-protocol) server that provides structured data on cognitive biases, enriched with live Wikipedia summaries.
+# Cognitive Bias Codex
 
-## 🚀 Features
+A searchable library of **423 cognitive biases, logical fallacies, and mental models** with an AR camera scanner that detects biases in real scenes using AI.
 
-* **Fast In-Memory Cache**: Loads `bias.csv` at startup for sub-millisecond reads.
-* **Enrichment**: Dynamically fetches and caches summaries from Wikipedia API.
-* **Pagination**: Full support for `page` and `size` parameters on search.
-* **Observability**: Built-in Prometheus metrics at `/metrics`.
-* **Structured Logging**: Production-ready JSON-friendly logging format.
-* **OpenAPI**: Automatic Swagger UI at `/docs`.
+Works on phone from anywhere — no home network required.
 
-## 🛠️ Stack
+## Features
 
-* **Python 3.10+**
-* **FastAPI** (Web Framework)
-* **Uvicorn** (ASGI Server)
-* **HTTPX** (Async HTTP Client)
-* **Prometheus Instrumentator** (Metrics)
+- **Library** — search and browse 423 concepts across all three categories
+- **AR Scanner** — point your camera at ads, social media, storefronts and detect cognitive biases in real time
+- **Three AI backends** (automatic fallback chain):
+  1. **Anthropic Claude** — full vision analysis (set `ANTHROPIC_API_KEY`)
+  2. **Hugging Face Inference API** — cloud text fallback, works anywhere (set `HF_TOKEN`)
+  3. **Local LLM** — home-network fallback at `localhost:1234`
 
-## 🏃 Quick Start
-
-### 1. Install Dependencies
+## Run locally
 
 ```bash
 pip install -r requirements.txt
-```
-
-### 2. Run Server
-
-```bash
 uvicorn main:app --reload
+# open http://localhost:8000
 ```
 
-### 3. Usage
+## Deploy to Hugging Face Spaces
 
-**Search Biases (Paginated)**
+1. Create a new Space at huggingface.co → New Space → **Docker** SDK
+2. Push this repo to that Space
+3. In Space Settings → **Secrets**, add:
+   - `HF_TOKEN` — your HF token (for Inference API)
+   - `ANTHROPIC_API_KEY` — optional, enables real vision scanning
+
+The app will be live at `https://huggingface.co/spaces/YOUR_USERNAME/cognitive-bias-codex`
+
+## Deploy anywhere else (Railway, Render, Fly.io)
 
 ```bash
-GET /search?term=confirmation&page=1&size=10
+# The Dockerfile is ready — just point any Docker host at this repo
+# Set PORT env var if needed (defaults to 7860 for HF Spaces, 8000 locally)
 ```
 
-**Get Detail (Enriched)**
+## API
 
-```bash
-GET /bias/confirmation_bias
-```
+| Endpoint | Description |
+|---|---|
+| `GET /search?term=&type=&page=&size=` | Search all concepts |
+| `GET /concept/{id}` | Single concept by ID |
+| `GET /concept/random` | Random concept |
+| `GET /categories` | All categories with counts |
+| `GET /stats` | Dataset + backend stats |
+| `GET /health` | Health check |
+| `POST /analyze` | Scan image for cognitive biases |
+| `GET /docs` | Swagger UI |
 
-**Check Health**
+## Data
 
-```bash
-GET /health
-```
-
-**View Metrics**
-
-```bash
-GET /metrics
-```
-
-## 📊 Data Schema (`bias.csv`)
-
-| Column | Description |
-| :--- | :--- |
-| `id` | Unique slug (e.g., `confirmation_bias`) |
-| `name` | Display name |
-| `category` | Broad grouping (Decision-making, Social, Memory) |
-| `subcategory` | Optional specific group |
-| `url` | Wikipedia URL source |
-| `wiki_summary` | Cached summary text (empty in CSV, filled by API) |
-
-## 🧪 Testing
-
-Run the included test harness:
-
-```bash
-python test_mcp.py
-```
+| Dataset | Count | Source |
+|---|---|---|
+| Cognitive Biases | 169 | Cognitive Bias Codex |
+| Logical Fallacies | 234 | yourlogicalfallacyis.com |
+| Mental Models | 20 | Curated frameworks |
