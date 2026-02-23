@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -322,9 +322,10 @@ def _tag_scene(parsed: dict, tag: str) -> dict:
     return parsed
 
 
-async def _try_huggingface() -> Optional[dict]:
+async def _try_huggingface(override_token: Optional[str] = None) -> Optional[dict]:
     """Call HF Inference API (text-only, cloud). Returns parsed dict or None."""
-    if not HF_TOKEN:
+    token = override_token or HF_TOKEN
+    if not token:
         return None
 
     prompt = (
@@ -346,7 +347,7 @@ async def _try_huggingface() -> Optional[dict]:
             resp = await client.post(
                 HF_API_URL,
                 json=payload,
-                headers={"Authorization": f"Bearer {HF_TOKEN}"},
+                headers={"Authorization": f"Bearer {token}"},
                 timeout=45.0,
             )
             if resp.status_code == 200:
@@ -572,13 +573,17 @@ def health_check():
 # ── AR Scanner ────────────────────────────────────────────────────────────────
 
 @app.post("/analyze", response_model=AnalyzeResponse, tags=["Scanner"])
-async def analyze_scene(req: AnalyzeRequest):
+async def analyze_scene(
+    req: AnalyzeRequest,
+    x_hf_token: Optional[str] = Header(None, description="Per-request Hugging Face token (overrides server HF_TOKEN)"),
+):
     """
     Analyze a base64-encoded camera frame for cognitive biases.
 
     Backend priority:
     1. Anthropic Claude (vision — if ANTHROPIC_API_KEY is set)
-    2. Local LLM at localhost:1234 (text-only fallback, no image analysis)
+    2. Hugging Face Inference API (cloud text — if HF_TOKEN set server-side OR X-HF-Token header provided)
+    3. Local LLM at localhost:1234 (text-only fallback, no image analysis)
     """
     if req.media_type not in _ALLOWED_MEDIA:
         raise HTTPException(
@@ -596,9 +601,9 @@ async def analyze_scene(req: AnalyzeRequest):
     if data:
         backend_used = "anthropic"
 
-    # 2. HF Inference API — cloud text fallback (requires HF_TOKEN, works anywhere)
+    # 2. HF Inference API — cloud text fallback (per-request X-HF-Token header or server HF_TOKEN)
     if data is None:
-        data = await _try_huggingface()
+        data = await _try_huggingface(override_token=x_hf_token)
         if data:
             backend_used = "huggingface"
 
@@ -641,6 +646,40 @@ async def analyze_scene(req: AnalyzeRequest):
         detected=detected,
         backend_used=backend_used,
     )
+
+
+# ── Auth helpers ──────────────────────────────────────────────────────────────
+
+class TokenRequest(BaseModel):
+    token: str
+
+
+@app.post("/auth/validate-hf-token", tags=["Auth"])
+async def validate_hf_token(body: TokenRequest):
+    """
+    Validate a Hugging Face token without storing it on the server.
+    Returns the account username on success.
+    """
+    token = body.token.strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Token is required.")
+    if not token.startswith("hf_"):
+        raise HTTPException(status_code=400, detail="Invalid format. HF tokens start with 'hf_'.")
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://huggingface.co/api/whoami-v2",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+        if resp.status_code == 200:
+            info = resp.json()
+            return {"valid": True, "username": info.get("name", "unknown")}
+        raise HTTPException(status_code=401, detail="Token invalid or expired.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Could not reach Hugging Face: {e}")
 
 
 # ── Serve UI ──────────────────────────────────────────────────────────────────

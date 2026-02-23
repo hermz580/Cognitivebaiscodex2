@@ -40,12 +40,84 @@
     .spinner { animation: spin 0.8s linear infinite; }
     .glow-tl { position:fixed; top:-10%; left:-20%; width:80%; height:40%; border-radius:50%; background:rgba(19,55,236,0.18); filter:blur(100px); pointer-events:none; z-index:0; }
     .glow-br { position:fixed; bottom:-10%; right:-20%; width:60%; height:40%; border-radius:50%; background:rgba(19,55,236,0.08); filter:blur(80px); pointer-events:none; z-index:0; }
+    /* Modal */
+    #hfModal { display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:1.5rem; }
+    #hfModal.open { display:flex; }
+    .step-num { width:1.5rem; height:1.5rem; border-radius:50%; background:#1337ec; color:#fff; font-size:0.7rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   </style>
 </head>
 
 <body class="min-h-screen overflow-hidden">
   <div class="glow-tl"></div>
   <div class="glow-br"></div>
+
+  <!-- ── HF CONNECT MODAL ────────────────────────────────────────────────── -->
+  <div id="hfModal" role="dialog" aria-modal="true" aria-labelledby="hfModalTitle">
+    <div class="glass-card rounded-2xl w-full max-w-sm p-6 space-y-5 border border-white/10">
+      <div class="flex items-center justify-between">
+        <h2 id="hfModalTitle" class="text-base font-bold text-white">Connect Hugging Face</h2>
+        <button id="hfModalClose" class="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+          <span class="material-icons-round text-xl">close</span>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-400 leading-relaxed">
+        Your token is <strong class="text-white">stored only in your browser</strong> and sent directly to Hugging Face.
+        It never touches our server and is never logged.
+      </p>
+
+      <!-- Step 1 -->
+      <div class="flex gap-3 items-start">
+        <span class="step-num mt-0.5">1</span>
+        <div class="flex-1">
+          <p class="text-xs text-slate-300 font-medium mb-2">Create a free Read token on Hugging Face</p>
+          <a id="hfCreateTokenBtn"
+            href="https://huggingface.co/settings/tokens/new?tokenType=read&description=CognitiveBiasCodex"
+            target="_blank" rel="noopener"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90"
+            style="background:#ff9d00;">
+            <span class="material-icons-round text-sm">open_in_new</span>
+            Open HF Token Page
+          </a>
+          <p class="text-[10px] text-slate-500 mt-1.5">Free account required &mdash; takes 30 seconds to create</p>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="flex gap-3 items-start">
+        <span class="step-num mt-0.5">2</span>
+        <div class="flex-1">
+          <p class="text-xs text-slate-300 font-medium mb-2">Paste your token below</p>
+          <input id="hfTokenInput" type="password"
+            placeholder="hf_xxxxxxxxxxxxxxxxxxxx"
+            autocomplete="off" spellcheck="false"
+            class="block w-full px-3 py-2 rounded-lg bg-white/5 text-white placeholder-slate-600 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary/50 border border-white/10 transition-all" />
+          <div id="hfValidationMsg" class="mt-1.5 text-[10px] hidden"></div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <button id="hfSaveBtn"
+        class="w-full py-2.5 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90"
+        style="background:#1337ec;">
+        <span class="material-icons-round text-base">verified</span>
+        Validate &amp; Save
+      </button>
+
+      <div id="hfAlreadyConnected" class="hidden glass-card rounded-xl p-3 border border-emerald-500/30">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-icons-round text-emerald-400 text-base">check_circle</span>
+            <div>
+              <p class="text-xs font-semibold text-emerald-400">Connected</p>
+              <p id="hfConnectedUser" class="text-[10px] text-slate-400"></p>
+            </div>
+          </div>
+          <button id="hfDisconnectBtn" class="text-[10px] text-rose-400 hover:underline">Disconnect</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="max-w-md mx-auto min-h-screen flex flex-col relative z-10 pb-20">
 
@@ -92,7 +164,17 @@
             <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">AR Scanner</p>
             <h1 class="text-xl font-bold text-white">Scan Scene</h1>
           </div>
-          <div id="backendBadge" class="text-[10px] font-mono px-2 py-1 rounded bg-white/5 text-slate-400 border border-white/10">detecting…</div>
+          <div class="flex items-center gap-2">
+            <div id="backendBadge" class="text-[10px] font-mono px-2 py-1 rounded bg-white/5 text-slate-400 border border-white/10">detecting…</div>
+            <!-- HF Connect button -->
+            <button id="hfConnectBadge" onclick="openHFModal()"
+              title="Connect your Hugging Face account for cloud AI analysis"
+              class="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono border transition-all hover:opacity-80"
+              style="background:rgba(255,157,0,0.1); border-color:rgba(255,157,0,0.3); color:#ff9d00;">
+              <span class="material-icons-round text-xs">hub</span>
+              <span id="hfBadgeLabel">HF: off</span>
+            </button>
+          </div>
         </div>
       </header>
       <main class="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4">
@@ -127,6 +209,74 @@
       </main>
     </div>
 
+    <!-- ── SETTINGS TAB ──────────────────────────────────────────────────── -->
+    <div id="tab-settings" class="tab-panel">
+      <header class="glass px-5 pt-12 pb-4 rounded-b-xl">
+        <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">Configuration</p>
+        <h1 class="text-xl font-bold text-white">Settings</h1>
+      </header>
+      <main class="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4">
+
+        <!-- HF Connection card -->
+        <div class="glass-card rounded-xl p-4 space-y-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="material-icons-round text-[#ff9d00]">hub</span>
+            <h2 class="text-sm font-bold text-white">Hugging Face AI</h2>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Connect your free Hugging Face account to enable cloud AI analysis.
+            Your token is saved <strong class="text-white">only in your browser</strong> — it never leaves your device except to call HF directly.
+          </p>
+          <div id="settingsHFStatus" class="glass-card rounded-lg p-3 border border-white/5">
+            <div id="settingsHFConnected" class="hidden flex items-center gap-2">
+              <span class="material-icons-round text-emerald-400 text-base">check_circle</span>
+              <div class="flex-1">
+                <p class="text-xs font-semibold text-emerald-400">Connected</p>
+                <p id="settingsHFUser" class="text-[10px] text-slate-400"></p>
+              </div>
+              <button id="settingsHFDisconnect" class="text-[10px] text-rose-400 hover:underline">Remove</button>
+            </div>
+            <div id="settingsHFDisconnectedState" class="flex items-center gap-2">
+              <span class="material-icons-round text-slate-500 text-base">link_off</span>
+              <p class="text-xs text-slate-500">Not connected</p>
+            </div>
+          </div>
+          <button onclick="openHFModal()" class="w-full py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90" style="background:rgba(255,157,0,0.15); color:#ff9d00; border:1px solid rgba(255,157,0,0.3);">
+            <span class="material-icons-round text-base">hub</span>
+            Connect Hugging Face — Free
+          </button>
+        </div>
+
+        <!-- Anthropic card -->
+        <div class="glass-card rounded-xl p-4 space-y-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="material-icons-round text-primary">visibility</span>
+            <h2 class="text-sm font-bold text-white">Anthropic Vision AI</h2>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono border border-white/10 text-slate-500 bg-white/5">server-side</span>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Full image vision analysis. Set <code class="text-primary bg-white/5 px-1 rounded">ANTHROPIC_API_KEY</code> as an environment variable on the server or in your Space secrets.
+          </p>
+          <div id="anthropicStatus" class="glass-card rounded-lg p-3 border border-white/5 text-xs text-slate-500 font-mono">checking…</div>
+        </div>
+
+        <!-- About card -->
+        <div class="glass-card rounded-xl p-4 space-y-2">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="material-icons-round text-slate-400">info</span>
+            <h2 class="text-sm font-bold text-white">About</h2>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Cognitive Bias Codex &mdash; a searchable library of 423 biases, fallacies, and mental models with an AR camera scanner.
+          </p>
+          <a href="/docs" target="_blank" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+            <span class="material-icons-round text-sm">api</span>API Docs (Swagger)
+          </a>
+        </div>
+
+      </main>
+    </div>
+
   </div>
 
   <!-- ── BOTTOM NAV ─────────────────────────────────────────────────────── -->
@@ -144,10 +294,149 @@
           <span class="text-[10px] font-medium text-slate-500 mt-0.5">Scan</span>
         </button>
       </li>
+      <li>
+        <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col items-center">
+          <span class="material-icons-round text-slate-500 text-2xl">settings</span>
+          <span class="text-[10px] font-medium text-slate-500 mt-0.5">Settings</span>
+        </button>
+      </li>
     </ul>
   </nav>
 
   <script>
+  // ── HF token storage ───────────────────────────────────────────────────────
+  const HF_KEY = "cbc_hf_token";
+  const HF_USER_KEY = "cbc_hf_user";
+
+  function getHFToken() { return localStorage.getItem(HF_KEY) || ""; }
+  function getHFUser()  { return localStorage.getItem(HF_USER_KEY) || ""; }
+
+  function saveHFToken(token, username) {
+    localStorage.setItem(HF_KEY, token);
+    localStorage.setItem(HF_USER_KEY, username);
+    updateHFUI();
+  }
+
+  function removeHFToken() {
+    localStorage.removeItem(HF_KEY);
+    localStorage.removeItem(HF_USER_KEY);
+    updateHFUI();
+  }
+
+  function updateHFUI() {
+    const token = getHFToken();
+    const user  = getHFUser();
+    const connected = !!token;
+
+    // Scan tab badge
+    const badge = document.getElementById("hfConnectBadge");
+    const label = document.getElementById("hfBadgeLabel");
+    if (connected) {
+      badge.style.background = "rgba(16,185,129,0.15)";
+      badge.style.borderColor = "rgba(16,185,129,0.4)";
+      badge.style.color = "#10b981";
+      label.textContent = "HF: on";
+    } else {
+      badge.style.background = "rgba(255,157,0,0.1)";
+      badge.style.borderColor = "rgba(255,157,0,0.3)";
+      badge.style.color = "#ff9d00";
+      label.textContent = "HF: off";
+    }
+
+    // Modal state
+    const alreadyCard = document.getElementById("hfAlreadyConnected");
+    const connUser    = document.getElementById("hfConnectedUser");
+    if (connected) {
+      alreadyCard.classList.remove("hidden");
+      connUser.textContent = "@" + user;
+    } else {
+      alreadyCard.classList.add("hidden");
+    }
+
+    // Settings tab
+    const sConn  = document.getElementById("settingsHFConnected");
+    const sDisc  = document.getElementById("settingsHFDisconnectedState");
+    const sUser  = document.getElementById("settingsHFUser");
+    if (connected) {
+      sConn.classList.remove("hidden");
+      sDisc.classList.add("hidden");
+      sUser.textContent = "@" + user;
+    } else {
+      sConn.classList.add("hidden");
+      sDisc.classList.remove("hidden");
+    }
+  }
+
+  // ── Modal ──────────────────────────────────────────────────────────────────
+  function openHFModal() {
+    document.getElementById("hfModal").classList.add("open");
+    document.getElementById("hfTokenInput").value = "";
+    const msg = document.getElementById("hfValidationMsg");
+    msg.classList.add("hidden");
+    msg.textContent = "";
+  }
+
+  function closeHFModal() {
+    document.getElementById("hfModal").classList.remove("open");
+  }
+
+  document.getElementById("hfModalClose").addEventListener("click", closeHFModal);
+  document.getElementById("hfModal").addEventListener("click", e => {
+    if (e.target === document.getElementById("hfModal")) closeHFModal();
+  });
+
+  document.getElementById("hfDisconnectBtn").addEventListener("click", () => {
+    removeHFToken(); closeHFModal();
+  });
+  document.getElementById("settingsHFDisconnect")?.addEventListener("click", () => removeHFToken());
+
+  document.getElementById("hfSaveBtn").addEventListener("click", async () => {
+    const input = document.getElementById("hfTokenInput");
+    const msg   = document.getElementById("hfValidationMsg");
+    const btn   = document.getElementById("hfSaveBtn");
+    const token = input.value.trim();
+
+    if (!token) {
+      msg.textContent = "Please paste your token first.";
+      msg.className   = "mt-1.5 text-[10px] text-amber-400";
+      msg.classList.remove("hidden");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-white border-t-transparent spinner"></div> Validating…`;
+    msg.classList.add("hidden");
+
+    try {
+      const res  = await fetch("/auth/validate-hf-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.valid) {
+        saveHFToken(token, data.username);
+        msg.textContent = `✓ Connected as @${data.username}`;
+        msg.className   = "mt-1.5 text-[10px] text-emerald-400";
+        msg.classList.remove("hidden");
+        input.value = "";
+        setTimeout(closeHFModal, 1200);
+      } else {
+        msg.textContent = data.detail || "Token invalid. Try again.";
+        msg.className   = "mt-1.5 text-[10px] text-rose-400";
+        msg.classList.remove("hidden");
+      }
+    } catch (_) {
+      msg.textContent = "Could not reach server. Try again.";
+      msg.className   = "mt-1.5 text-[10px] text-rose-400";
+      msg.classList.remove("hidden");
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = `<span class="material-icons-round text-base">verified</span> Validate &amp; Save`;
+  });
+
   // ── state ──────────────────────────────────────────────────────────────────
   const S = { page:1, size:20, term:"", type:"", loading:false, hasMore:true, stream:null };
 
@@ -156,7 +445,8 @@
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
     document.getElementById("tab-" + name).classList.add("active");
 
-    const tabs = { library: "nav-library", scan: "nav-scan" };
+    const tabs = { library: "nav-library", scan: "nav-scan", settings: "nav-settings" };
+    const icons = { library: "auto_stories", scan: "radar", settings: "settings" };
     Object.entries(tabs).forEach(([t, id]) => {
       const btn  = document.getElementById(id);
       const icon = btn.querySelector(".material-icons-round");
@@ -257,15 +547,15 @@
       const data = await (await fetch("/stats")).json();
       document.getElementById("totalCount").textContent = data.total_concepts.toLocaleString();
       const badge = document.getElementById("backendBadge");
+      const anthr = document.getElementById("anthropicStatus");
       if (data.ai_backend.includes("anthropic")) {
         badge.textContent = "vision AI ready";
         badge.style.color = "#10b981";
-      } else if (data.ai_backend.includes("huggingface")) {
-        badge.textContent = "HF cloud ready";
-        badge.style.color = "#f59e0b";
+        if (anthr) { anthr.textContent = "✓ Configured (server-side)"; anthr.style.color = "#10b981"; }
       } else {
-        badge.textContent = "local LLM only";
-        badge.style.color = "#ef4444";
+        badge.textContent = getHFToken() ? "HF connected" : "no vision AI";
+        badge.style.color = getHFToken() ? "#f59e0b" : "#ef4444";
+        if (anthr) { anthr.textContent = "Not configured — set ANTHROPIC_API_KEY in server environment"; anthr.style.color = "#6b7280"; }
       }
     } catch (_) {}
   }
@@ -309,9 +599,13 @@
     scanBtn.disabled = true;
 
     try {
+      const headers = { "Content-Type": "application/json" };
+      const hfToken = getHFToken();
+      if (hfToken) headers["X-HF-Token"] = hfToken;
+
       const res  = await fetch("/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ image: b64, media_type: "image/jpeg" }),
       });
       const data = await res.json();
@@ -361,7 +655,8 @@
     el.classList.remove("hidden");
   }
 
-  // init
+  // ── init ───────────────────────────────────────────────────────────────────
+  updateHFUI();
   loadStats();
   loadPage(true);
   </script>
