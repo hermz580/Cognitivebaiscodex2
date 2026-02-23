@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import random
+import re
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -305,15 +306,38 @@ async def _try_anthropic(image_b64: str, media_type: str) -> Optional[dict]:
         return None
 
 
-def _strip_json(raw: str) -> str:
-    """Strip markdown code fences and return raw JSON string."""
+def _extract_json(raw: str) -> Optional[dict]:
+    """
+    Robustly extract a JSON object from messy LLM output.
+    Tries multiple strategies before giving up.
+    """
     raw = raw.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
-    return raw
+
+    # Strategy 1: strip markdown code fences then parse
+    clean = raw
+    if "```" in clean:
+        parts = clean.split("```")
+        # parts[1] is inside the first fence pair
+        if len(parts) >= 2:
+            inner = parts[1]
+            if inner.startswith("json"):
+                inner = inner[4:]
+            clean = inner.strip()
+
+    # Strategy 2: find the outermost { ... } span
+    start = clean.find("{")
+    end   = clean.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        clean = clean[start : end + 1]
+
+    # Strategy 3: attempt parse; if it fails try stripping trailing commas
+    for attempt in (clean, re.sub(r",\s*([}\]])", r"\1", clean)):
+        try:
+            return json.loads(attempt)
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+    return None
 
 
 def _tag_scene(parsed: dict, tag: str) -> dict:
@@ -322,16 +346,76 @@ def _tag_scene(parsed: dict, tag: str) -> dict:
     return parsed
 
 
-async def _try_huggingface(override_token: Optional[str] = None) -> Optional[dict]:
-    """Call HF Inference API (text-only, cloud). Returns parsed dict or None."""
+_HF_CAPTION_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large"
+
+
+async def _caption_image_hf(image_b64: str, token: str) -> Optional[str]:
+    """
+    Use BLIP via HF Inference API to generate a plain-text caption of the image.
+    Returns the caption string, or None on failure.
+    """
+    import base64
+    try:
+        img_bytes = base64.b64decode(image_b64)
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                _HF_CAPTION_URL,
+                content=img_bytes,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "image/jpeg",
+                },
+                timeout=30.0,
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, list) and data:
+                caption = data[0].get("generated_text", "").strip()
+                if caption:
+                    logger.info(f"BLIP caption: {caption!r}")
+                    return caption
+        logger.debug(f"BLIP caption failed ({resp.status_code}): {resp.text[:120]}")
+    except Exception as e:
+        logger.debug(f"BLIP caption error: {e}")
+    return None
+
+
+async def _try_huggingface(
+    override_token: Optional[str] = None,
+    image_b64: Optional[str] = None,
+) -> Optional[dict]:
+    """
+    Call HF Inference API.  When image_b64 is provided:
+      1. Caption the image with BLIP (vision model, free tier).
+      2. Pass the caption + scene context to the text LLM for bias analysis.
+    Falls back to generic text analysis when no image is available.
+    """
     token = override_token or HF_TOKEN
     if not token:
         return None
 
+    scene_context = ""
+    used_vision = False
+
+    if image_b64:
+        caption = await _caption_image_hf(image_b64, token)
+        if caption:
+            scene_context = (
+                f"The image shows: {caption}\n\n"
+                "Based on this scene, identify cognitive biases or logical fallacies "
+                "that are likely present."
+            )
+            used_vision = True
+
+    if not scene_context:
+        scene_context = (
+            "Identify the top 3 cognitive biases most commonly found in advertisements "
+            "and marketing materials based on typical visual patterns."
+        )
+
     prompt = (
         f"[INST] {_SYSTEM_PROMPT}\n\n"
-        "Identify the top 3 cognitive biases most commonly found in advertisements "
-        "and marketing materials based on typical visual patterns. "
+        f"{scene_context} "
         "Return ONLY the raw JSON object — no markdown, no explanation. [/INST]"
     )
     payload = {
@@ -357,10 +441,12 @@ async def _try_huggingface(override_token: Optional[str] = None) -> Optional[dic
                     raw = data[0].get("generated_text", "")
                 elif isinstance(data, dict):
                     raw = data.get("generated_text", "")
-                raw = _strip_json(raw)
-                if not raw:
+                parsed = _extract_json(raw)
+                if not parsed:
+                    logger.warning("HF response contained no parseable JSON")
                     return None
-                parsed = json.loads(raw)
+                if used_vision:
+                    return _tag_scene(parsed, "[Cloud vision analysis via BLIP + HF] ")
                 return _tag_scene(parsed, "[Cloud text analysis — image not processed] ")
             logger.warning(f"HF API returned {resp.status_code}: {resp.text[:200]}")
     except Exception as e:
@@ -392,10 +478,9 @@ async def _try_local_llm() -> Optional[dict]:
                     or data.get("message", {}).get("content", "")
                     or ""
                 )
-                raw = _strip_json(raw)
-                if not raw:
+                parsed = _extract_json(raw)
+                if not parsed:
                     return None
-                parsed = json.loads(raw)
                 return _tag_scene(parsed, "[Local text analysis — image not processed] ")
     except Exception as e:
         logger.debug(f"Local LLM unavailable: {e}")
@@ -601,9 +686,9 @@ async def analyze_scene(
     if data:
         backend_used = "anthropic"
 
-    # 2. HF Inference API — cloud text fallback (per-request X-HF-Token header or server HF_TOKEN)
+    # 2. HF Inference API — BLIP caption then bias analysis (or text-only fallback)
     if data is None:
-        data = await _try_huggingface(override_token=x_hf_token)
+        data = await _try_huggingface(override_token=x_hf_token, image_b64=req.image)
         if data:
             backend_used = "huggingface"
 

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pytest pytest-asyncio httpx
+
+      - name: Lint (ruff)
+        run: ruff check . --select E,F,W,I --ignore E501 --exclude __pycache__
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+        # asyncio_mode = auto is set in pytest.ini
+        env:
+          # No real keys in CI — tests use mocks
+          ANTHROPIC_API_KEY: ""
+          HF_TOKEN: ""

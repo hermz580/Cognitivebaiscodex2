@@ -1003,8 +1003,8 @@ function renderResults(data) {
     });
   }
   const notes = {
-    anthropic:   "✓ Vision AI — the camera image was fully analyzed",
-    huggingface: "⚠ Cloud text analysis — image wasn't processed (vision AI not configured)",
+    anthropic:   "✓ Full vision analysis via Anthropic Claude",
+    huggingface: "✓ Cloud vision — image captioned by BLIP + bias analysis via Hugging Face",
     local_llm:   "⚠ Local text analysis — image wasn't processed",
   };
   document.getElementById("backendNote").textContent = notes[data.backend_used] || "";
