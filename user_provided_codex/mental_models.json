@@ -118,5 +118,17 @@
         "description": "Projecting yourself to age 80 and asking, 'Will I regret not doing this?'",
         "category": "Decision Making",
         "example": "Jeff Bezos quitting his job to start Amazon because he knew he would regret not trying, but wouldn't regret failing."
+    },
+    {
+        "name": "Data Sovereignty",
+        "description": "The principle that a community or individual has the right to own, control, and govern the collection, application, and use of their data.",
+        "category": "Liberation Technology",
+        "example": "BlaqVox returning data power to the community by monitoring government APIs directly rather than relying on curated reports."
+    },
+    {
+        "name": "Community Intelligence",
+        "description": "The collective insight generated when local residents, activists, and data analysts collaborate to identify and mitigate threats in real-time.",
+        "category": "Liberation Technology",
+        "example": "Aggregating ACLU civil rights cases with real-time threat detection to protect target communities in Seattle, Chicago, and Atlanta."
     }
 ]

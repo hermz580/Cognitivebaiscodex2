@@ -1181,5 +1181,19 @@
     "subcategory": "Memories stored differently via experience",
     "url": "https://en.wikipedia.org/wiki/Google_effect",
     "description": "Click to view external source."
+  },
+  {
+    "name": "Institutional Erasure",
+    "category": "Systemic Bias",
+    "subcategory": "Liberation Technology",
+    "url": "https://blaqvox.org/institutional-erasure",
+    "description": "The systematic exclusion or removal of community-specific data and history from official government records and datasets."
+  },
+  {
+    "name": "Algorithmic Oppression",
+    "category": "Systemic Bias",
+    "subcategory": "Liberation Technology",
+    "url": "https://blaqvox.org/algorithmic-oppression",
+    "description": "The use of automated decision systems to replicate and amplify existing social inequalities and racial discrimination."
   }
 ]
