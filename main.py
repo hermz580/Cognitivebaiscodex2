@@ -2,7 +2,6 @@
 # ── main.py ────────────────────────
 
 import asyncio
-import csv
 import json
 import logging
 import os
@@ -12,38 +11,51 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import anthropic
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
-# --- Configure Logging (Strategy C) ---
+# --- Configure Logging ---
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-logger = logging.getLogger("mcp-server")
+logger = logging.getLogger("codex-server")
+
+# ── Data file paths ──────────────────────────────────────────────────────────
+_DATA_DIR = Path("user_provided_codex")
+BIASES_JSON   = _DATA_DIR / "biases.json"
+FALLACIES_JSON = _DATA_DIR / "fallacies.json"
+MODELS_JSON   = _DATA_DIR / "mental_models.json"
+
+# ── AI backend config ────────────────────────────────────────────────────────
+LOCAL_LLM_URL   = os.getenv("LOCAL_LLM_URL", "http://localhost:1234/api/v1/chat")
+LOCAL_LLM_MODEL = os.getenv(
+    "LOCAL_LLM_MODEL",
+    "openai-gpt-oss-20b-abliterated-uncensored-neo-imatrix",
+)
 
 
-# --- Data Models ---
-class Bias(BaseModel):
-    """A single row in the master table."""
+# ── Pydantic models ──────────────────────────────────────────────────────────
+
+class Concept(BaseModel):
     id: str
-    name: str = Field(..., description="Name of the cognitive bias")
-    category: str = Field(..., description="Broad category (e.g., Decision-making)")
-    subcategory: str = Field(default="", description="Optional sub-grouping")
-    url: str = Field(default="", description="Wikipedia or source URL")
-    wiki_summary: Optional[str] = Field(default=None, description="Enriched summary from Wikipedia")
+    name: str
+    type: str                          # "bias" | "fallacy" | "mental_model"
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    description: Optional[str] = None
+    url: Optional[str] = None
+    wiki_summary: Optional[str] = None
 
 
-class PaginatedResponse(BaseModel):
-    """Standard pagination wrapper (Strategy B)."""
-    items: List[Bias]
+class PaginatedConcepts(BaseModel):
+    items: List[Concept]
     page: int
     size: int
     total: int
@@ -51,332 +63,167 @@ class PaginatedResponse(BaseModel):
 
 
 class CategoryStat(BaseModel):
-    """Category with bias count."""
     category: str
     count: int
-    subcategories: List[str]
 
 
 class StatsResponse(BaseModel):
-    """Overall dataset statistics."""
     total_biases: int
-    total_categories: int
-    total_subcategories: int
-    cached_summaries: int
-    categories: List[CategoryStat]
-
-
-# --- AR Scanner Models ---
-class AnalyzeRequest(BaseModel):
-    image: str = Field(..., description="Base64-encoded image data (JPEG or PNG)")
-    media_type: str = Field(default="image/jpeg", description="MIME type: image/jpeg or image/png")
+    total_fallacies: int
+    total_mental_models: int
+    total_concepts: int
+    ai_backend: str
 
 
 class DetectedConcept(BaseModel):
     name: str
     reason: str
-    confidence: str  # "high" | "medium" | "low"
+    confidence: str        # "high" | "medium" | "low"
+    type: str = "bias"     # "bias" | "fallacy"
     category: Optional[str] = None
     subcategory: Optional[str] = None
     url: Optional[str] = None
 
 
+class AnalyzeRequest(BaseModel):
+    image: str = Field(..., description="Base64-encoded image data (JPEG or PNG)")
+    media_type: str = Field(default="image/jpeg")
+
+
 class AnalyzeResponse(BaseModel):
     scene: str
     detected: List[DetectedConcept]
+    backend_used: str       # "anthropic" | "local_llm" | "none"
 
 
-# --- Global State & Caching (Strategy A) ---
-CSV_FILE = Path("bias.csv")
-_cached_biases: List[dict] = []
-_last_loaded: float = 0.0
+# ── In-memory caches ─────────────────────────────────────────────────────────
+_biases:        List[dict] = []
+_fallacies:     List[dict] = []
+_mental_models: List[dict] = []
 
 
-def load_csv() -> List[dict]:
-    """
-    Read `bias.csv` into a global in-memory cache.
-    Adds a simple check to perform a reload only on startup or manual trigger.
-    """
-    global _cached_biases, _last_loaded
-    if not CSV_FILE.exists():
-        logger.error(f"CSV file not found at {CSV_FILE.absolute()}")
-        return []
+def _load_data():
+    global _biases, _fallacies, _mental_models
 
-    try:
-        with open(CSV_FILE, "r", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            temp_list = []
-            for r in reader:
-                # Ensure all required fields exist with defaults
-                if "wiki_summary" not in r:
-                    r["wiki_summary"] = None
-                temp_list.append(r)
+    # Biases (JSON array)
+    if BIASES_JSON.exists():
+        with open(BIASES_JSON, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        _biases = [
+            {
+                "id":          f"bias_{i}",
+                "name":        r.get("name", ""),
+                "type":        "bias",
+                "category":    r.get("category", ""),
+                "subcategory": r.get("subcategory", ""),
+                "description": r.get("description", ""),
+                "url":         r.get("url", ""),
+                "wiki_summary": None,
+            }
+            for i, r in enumerate(raw)
+        ]
+        logger.info(f"Loaded {len(_biases)} biases.")
+    else:
+        logger.warning(f"Biases file not found: {BIASES_JSON}")
 
-            _cached_biases = temp_list
-            _last_loaded = time.time()
-            logger.info(f"Loaded {len(_cached_biases)} records from CSV.")
-            return _cached_biases
-    except Exception as e:
-        logger.error(f"Failed to load CSV: {e}")
-        return []
+    # Fallacies (JSONL — one JSON object per line)
+    if FALLACIES_JSON.exists():
+        with open(FALLACIES_JSON, "r", encoding="utf-8") as f:
+            lines = [ln.strip() for ln in f if ln.strip()]
+        _fallacies = []
+        for i, line in enumerate(lines):
+            try:
+                r = json.loads(line)
+                _fallacies.append({
+                    "id":          f"fallacy_{i}",
+                    "name":        r.get("name", ""),
+                    "type":        "fallacy",
+                    "category":    "Logical Fallacy",
+                    "subcategory": "",
+                    "description": r.get("description", ""),
+                    "url":         "",
+                    "wiki_summary": None,
+                })
+            except json.JSONDecodeError:
+                pass
+        logger.info(f"Loaded {len(_fallacies)} fallacies.")
+    else:
+        logger.warning(f"Fallacies file not found: {FALLACIES_JSON}")
+
+    # Mental models (JSON array)
+    if MODELS_JSON.exists():
+        with open(MODELS_JSON, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        _mental_models = [
+            {
+                "id":          f"model_{i}",
+                "name":        r.get("name", ""),
+                "type":        "mental_model",
+                "category":    r.get("category", "Mental Model"),
+                "subcategory": "",
+                "description": r.get("description", ""),
+                "url":         "",
+                "wiki_summary": None,
+            }
+            for i, r in enumerate(raw)
+        ]
+        logger.info(f"Loaded {len(_mental_models)} mental models.")
+    else:
+        logger.warning(f"Mental models file not found: {MODELS_JSON}")
 
 
-# --- Wikipedia Enrichment Helper ---
-async def fetch_wikipedia_summary(title_or_id: str, lang: str = "en") -> Optional[str]:
-    """
-    Fetch the summary paragraph from Wikipedia API.
-    Uses httpx for async non-blocking I/O.
-    """
-    if not title_or_id:
+def _all_concepts() -> List[dict]:
+    return _biases + _fallacies + _mental_models
+
+
+def _match_concept(name: str) -> Optional[dict]:
+    """Case-insensitive fuzzy match across all concept types."""
+    name_lower = name.lower()
+    for pool in (_biases, _fallacies, _mental_models):
+        for c in pool:
+            if c.get("name", "").lower() == name_lower:
+                return c
+    for pool in (_biases, _fallacies, _mental_models):
+        for c in pool:
+            cn = c.get("name", "").lower()
+            if name_lower in cn or cn in name_lower:
+                return c
+    return None
+
+
+# ── Wikipedia enrichment ─────────────────────────────────────────────────────
+
+async def _fetch_wiki_summary(title_or_url: str) -> Optional[str]:
+    if not title_or_url:
         return None
-
-    # Extract the title from the URL if needed, or assume ID is the title
-    clean_title = title_or_id.split("/")[-1] if "/" in title_or_id else title_or_id
-
-    url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{clean_title}"
-    headers = {"User-Agent": "CognitiveBiasCodexMCP/1.0 (educational use)"}
+    title = title_or_url.split("/")[-1] if "/" in title_or_url else title_or_url
+    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
+    headers = {"User-Agent": "CognitiveBiasCodex/2.0 (educational use)"}
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, timeout=5.0, headers=headers)
             if resp.status_code == 200:
-                data = resp.json()
-                return data.get("extract")
-            else:
-                logger.warning(f"Wikipedia fetch failed for '{clean_title}': {resp.status_code}")
-                return None
+                return resp.json().get("extract")
     except Exception as e:
-        logger.error(f"Error fetching Wikipedia summary: {e}")
-        return None
+        logger.debug(f"Wiki fetch error: {e}")
+    return None
 
 
-async def enrich_bias(bias_obj: dict) -> dict:
-    """
-    Enrich a single bias dict with a Wikipedia summary if not already present.
-    Writes the result back to _cached_biases so subsequent requests skip the fetch.
-    """
-    if bias_obj.get("wiki_summary"):
-        return bias_obj
-
-    summary = await fetch_wikipedia_summary(bias_obj.get("url") or bias_obj.get("name"))
+async def _enrich(concept: dict) -> dict:
+    if concept.get("wiki_summary"):
+        return concept
+    summary = await _fetch_wiki_summary(concept.get("url") or concept.get("name", ""))
     if summary:
-        bias_obj["wiki_summary"] = summary
-        # Write-back: update the shared cache so future requests benefit
-        for cached in _cached_biases:
-            if cached.get("id") == bias_obj.get("id"):
-                cached["wiki_summary"] = summary
-                break
-
-    return bias_obj
+        concept["wiki_summary"] = summary
+    return concept
 
 
-# --- App Lifecycle ---
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Run startup and shutdown tasks (Strategy A - Cache Warming)."""
-    logger.info("Starting up MCP Server...")
-    load_csv()
-    yield
-    logger.info("Shutting down MCP Server...")
+# ── AI backends ──────────────────────────────────────────────────────────────
 
-
-# --- Build FastAPI App ---
-app = FastAPI(
-    title="Cognitive Bias Codex MCP",
-    description="A Model Context Protocol (MCP) server providing structured data on cognitive biases.",
-    version="1.1.0",
-    lifespan=lifespan,
-)
-
-# Enable CORS (open by default for local development)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- Instrumentation (Strategy G - Prometheus) ---
-Instrumentator().instrument(app).expose(app)
-
-
-# --- Endpoints ---
-
-@app.get("/search", response_model=PaginatedResponse, tags=["Biases"])
-async def search_biases(
-    term: Optional[str] = Query(None, description="Search term for name, category, or subcategory"),
-    category: Optional[str] = Query(None, description="Filter by exact category name (case-insensitive)"),
-    page: int = Query(1, ge=1, description="Page number"),
-    size: int = Query(20, ge=1, le=100, description="Items per page"),
-    enrich: bool = Query(False, description="Fetch live Wikipedia summaries?")
-):
-    """
-    Search biases with pagination.
-    - `term`: free-text search across name, category, and subcategory
-    - `category`: narrow down to a specific category
-    - `enrich`: fetch Wikipedia summaries in parallel for the current page
-    """
-    results = _cached_biases
-
-    # Free-text filter across name, category, and subcategory
-    if term:
-        t = term.lower()
-        results = [
-            b for b in results
-            if t in b.get("name", "").lower()
-            or t in b.get("category", "").lower()
-            or t in b.get("subcategory", "").lower()
-        ]
-
-    # Strict category filter
-    if category:
-        cat_lower = category.lower()
-        results = [b for b in results if b.get("category", "").lower() == cat_lower]
-
-    # Pagination
-    total = len(results)
-    total_pages = max(1, (total + size - 1) // size)
-    start = (page - 1) * size
-    end = start + size
-    paginated_items = results[start:end]
-
-    # Parallel enrichment for the current page
-    if enrich:
-        copies = [item.copy() for item in paginated_items]
-        enriched = await asyncio.gather(*[enrich_bias(b) for b in copies])
-        final_items = list(enriched)
-    else:
-        final_items = [item.copy() for item in paginated_items]
-
-    return {
-        "items": final_items,
-        "page": page,
-        "size": size,
-        "total": total,
-        "total_pages": total_pages,
-    }
-
-
-@app.get("/bias/random", response_model=Bias, tags=["Biases"])
-async def get_random_bias(
-    enrich: bool = Query(True, description="Fetch live Wikipedia summary?")
-):
-    """
-    Return a randomly selected bias. Useful for 'bias of the day' features.
-    """
-    if not _cached_biases:
-        raise HTTPException(status_code=503, detail="Bias data not loaded.")
-
-    record = random.choice(_cached_biases).copy()
-    if enrich:
-        record = await enrich_bias(record)
-    return record
-
-
-@app.get("/bias/{bias_id}", response_model=Bias, tags=["Biases"])
-async def get_bias_detail(
-    bias_id: str,
-    enrich: bool = Query(True, description="Fetch live Wikipedia summary?")
-):
-    """
-    Get a single bias by ID. Auto-enriches with Wikipedia data (cached in-session).
-    """
-    record = next((b for b in _cached_biases if b.get("id") == bias_id), None)
-
-    if not record:
-        raise HTTPException(status_code=404, detail=f"Bias with ID '{bias_id}' not found.")
-
-    bias_obj = record.copy()
-    if enrich:
-        bias_obj = await enrich_bias(bias_obj)
-
-    return bias_obj
-
-
-@app.get("/categories", response_model=List[CategoryStat], tags=["Discovery"])
-def get_categories():
-    """
-    Return all categories with their bias counts and distinct subcategories.
-    """
-    cat_map: Dict[str, Dict] = {}
-    for b in _cached_biases:
-        cat = b.get("category", "").strip()
-        sub = b.get("subcategory", "").strip()
-        if not cat:
-            continue
-        if cat not in cat_map:
-            cat_map[cat] = {"count": 0, "subcategories": set()}
-        cat_map[cat]["count"] += 1
-        if sub:
-            cat_map[cat]["subcategories"].add(sub)
-
-    return [
-        CategoryStat(
-            category=cat,
-            count=info["count"],
-            subcategories=sorted(info["subcategories"]),
-        )
-        for cat, info in sorted(cat_map.items())
-    ]
-
-
-@app.get("/stats", response_model=StatsResponse, tags=["Discovery"])
-def get_stats():
-    """
-    Return high-level statistics about the loaded dataset.
-    """
-    categories: Dict[str, Dict] = {}
-    cached_summaries = 0
-
-    for b in _cached_biases:
-        cat = b.get("category", "").strip()
-        sub = b.get("subcategory", "").strip()
-        if cat:
-            if cat not in categories:
-                categories[cat] = {"count": 0, "subcategories": set()}
-            categories[cat]["count"] += 1
-            if sub:
-                categories[cat]["subcategories"].add(sub)
-        if b.get("wiki_summary"):
-            cached_summaries += 1
-
-    all_subcategories = set()
-    for info in categories.values():
-        all_subcategories.update(info["subcategories"])
-
-    category_stats = [
-        CategoryStat(
-            category=cat,
-            count=info["count"],
-            subcategories=sorted(info["subcategories"]),
-        )
-        for cat, info in sorted(categories.items())
-    ]
-
-    return StatsResponse(
-        total_biases=len(_cached_biases),
-        total_categories=len(categories),
-        total_subcategories=len(all_subcategories),
-        cached_summaries=cached_summaries,
-        categories=category_stats,
-    )
-
-
-@app.get("/health", tags=["System"])
-def health_check():
-    """Simple health check endpoint."""
-    return {
-        "status": "ok",
-        "cached_records": len(_cached_biases),
-        "cached_summaries": sum(1 for b in _cached_biases if b.get("wiki_summary")),
-    }
-
-
-# --- AR Scanner ---
-
-_CLAUDE_SYSTEM_PROMPT = """You are a cognitive bias analyst with expertise in applied psychology.
-When shown an image, identify cognitive biases and logical fallacies that are VISUALLY EVIDENCED
-by specific elements you can see. Never speculate — only report what is directly visible.
+_SYSTEM_PROMPT = """You are a cognitive bias analyst with expertise in applied psychology.
+When shown an image (or asked about common patterns), identify cognitive biases and logical
+fallacies that are VISUALLY EVIDENCED by specific elements. Never speculate beyond what is
+directly observable.
 
 Common visual evidence patterns:
 - Sale prices with crossed-out originals → Anchoring Bias
@@ -404,65 +251,22 @@ Return ONLY a raw JSON object — no markdown, no code fences, no extra text:
 }
 Maximum 5 biases. If nothing is clearly evidenced, return an empty "biases" array."""
 
-_ALLOWED_MEDIA_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
-_MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MB base64 limit
+_ALLOWED_MEDIA = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+_MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 
-def _get_anthropic_client() -> anthropic.AsyncAnthropic:
+async def _try_anthropic(image_b64: str, media_type: str) -> Optional[dict]:
+    """Call Anthropic Claude with full vision. Returns parsed dict or None."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="ANTHROPIC_API_KEY environment variable not set. "
-                   "Add it to your environment to enable AR scanning."
-        )
-    return anthropic.AsyncAnthropic(api_key=api_key)
-
-
-def _match_local_bias(name: str) -> Optional[dict]:
-    """Case-insensitive fuzzy match of a detected bias name against the local CSV data."""
-    name_lower = name.lower()
-    # Exact match first
-    for b in _cached_biases:
-        if b.get("name", "").lower() == name_lower:
-            return b
-    # Substring match
-    for b in _cached_biases:
-        if name_lower in b.get("name", "").lower() or b.get("name", "").lower() in name_lower:
-            return b
-    return None
-
-
-@app.post("/analyze", response_model=AnalyzeResponse, tags=["AR Scanner"])
-async def analyze_scene(req: AnalyzeRequest):
-    """
-    Analyze a base64-encoded camera frame for cognitive biases using Claude vision.
-
-    Pass a JPEG or PNG image captured from the device camera and receive a list
-    of detected cognitive biases with explanations matched against the local database.
-
-    Requires the `ANTHROPIC_API_KEY` environment variable to be set.
-    """
-    if req.media_type not in _ALLOWED_MEDIA_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported media_type '{req.media_type}'. "
-                   f"Allowed: {sorted(_ALLOWED_MEDIA_TYPES)}"
-        )
-
-    if len(req.image) > _MAX_IMAGE_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail="Image too large. Compress or reduce resolution before sending."
-        )
-
-    client = _get_anthropic_client()
-
+        return None
     try:
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=api_key)
         response = await client.messages.create(
             model="claude-opus-4-6",
             max_tokens=1024,
-            system=_CLAUDE_SYSTEM_PROMPT,
+            system=_SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
                 "content": [
@@ -470,54 +274,293 @@ async def analyze_scene(req: AnalyzeRequest):
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": req.media_type,
-                            "data": req.image,
+                            "media_type": media_type,
+                            "data": image_b64,
                         },
                     },
                     {
                         "type": "text",
-                        "text": (
-                            "Analyze this image for cognitive biases. "
-                            "Return only the JSON object as described."
-                        ),
+                        "text": "Analyze this image for cognitive biases. Return only the JSON object as described.",
                     },
                 ],
             }],
         )
-    except anthropic.BadRequestError as e:
-        raise HTTPException(status_code=400, detail=f"Image rejected by Claude: {e.message}")
-    except anthropic.AuthenticationError:
-        raise HTTPException(status_code=503, detail="Invalid ANTHROPIC_API_KEY.")
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+        return json.loads(raw)
     except Exception as e:
-        logger.error(f"Claude API error during /analyze: {e}")
-        raise HTTPException(status_code=503, detail="Analysis service temporarily unavailable.")
+        logger.warning(f"Anthropic error: {e}")
+        return None
 
-    # Parse Claude's JSON response
-    raw_text = response.content[0].text.strip()
-    # Strip markdown code fences if present
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("```")[1]
-        if raw_text.startswith("json"):
-            raw_text = raw_text[4:]
-        raw_text = raw_text.strip()
 
+async def _try_local_llm() -> Optional[dict]:
+    """Call local LLM (text-only fallback). Returns parsed dict or None."""
+    user_input = (
+        "Identify the top 3 cognitive biases most commonly found in advertisements "
+        "and marketing materials. Use your knowledge of typical visual patterns. "
+        "Return only the JSON object."
+    )
+    payload = {
+        "model": LOCAL_LLM_MODEL,
+        "system_prompt": _SYSTEM_PROMPT,
+        "input": user_input,
+    }
     try:
-        data = json.loads(raw_text)
-    except json.JSONDecodeError:
-        logger.error(f"/analyze: Could not parse Claude JSON: {raw_text[:200]}")
-        return AnalyzeResponse(scene="Scene analyzed.", detected=[])
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(LOCAL_LLM_URL, json=payload, timeout=30.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                # Handle various local LLM response shapes
+                raw = (
+                    data.get("response")
+                    or data.get("output")
+                    or data.get("text")
+                    or data.get("message", {}).get("content", "")
+                    or ""
+                )
+                if not raw:
+                    return None
+                raw = raw.strip()
+                if raw.startswith("```"):
+                    raw = raw.split("```")[1]
+                    if raw.startswith("json"):
+                        raw = raw[4:]
+                    raw = raw.strip()
+                parsed = json.loads(raw)
+                # Mark scene so user knows image was not analysed
+                parsed["scene"] = (
+                    "[Text-only analysis — image not processed] "
+                    + parsed.get("scene", "Common bias patterns identified.")
+                )
+                return parsed
+    except Exception as e:
+        logger.debug(f"Local LLM unavailable: {e}")
+    return None
 
-    # Enrich each detected bias with local database info
+
+def _detect_ai_backend() -> str:
+    """Return a human-readable label for which backend is active."""
+    has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    if has_anthropic:
+        return "anthropic+local_fallback"
+    return "local_llm_only"
+
+
+# ── App lifecycle ─────────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting Cognitive Bias Codex server…")
+    _load_data()
+    logger.info(
+        f"Data ready: {len(_biases)} biases, "
+        f"{len(_fallacies)} fallacies, "
+        f"{len(_mental_models)} mental models."
+    )
+    yield
+    logger.info("Server shutting down.")
+
+
+app = FastAPI(
+    title="Cognitive Bias Codex",
+    description="Unified API for cognitive biases, logical fallacies, and mental models with AR scanning.",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+Instrumentator().instrument(app).expose(app)
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@app.get("/search", response_model=PaginatedConcepts, tags=["Library"])
+async def search_concepts(
+    term: Optional[str] = Query(None, description="Free-text search across name, category, description"),
+    type: Optional[str] = Query(None, description="Filter by type: bias | fallacy | mental_model"),
+    category: Optional[str] = Query(None, description="Filter by category (case-insensitive)"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    enrich: bool = Query(False, description="Fetch Wikipedia summaries?"),
+):
+    """Search across all biases, fallacies, and mental models."""
+    results = _all_concepts()
+
+    if type:
+        results = [c for c in results if c.get("type") == type.lower()]
+
+    if category:
+        cat_lower = category.lower()
+        results = [c for c in results if cat_lower in c.get("category", "").lower()]
+
+    if term:
+        t = term.lower()
+        results = [
+            c for c in results
+            if t in c.get("name", "").lower()
+            or t in c.get("category", "").lower()
+            or t in c.get("description", "").lower()
+        ]
+
+    total = len(results)
+    total_pages = max(1, (total + size - 1) // size)
+    start = (page - 1) * size
+    page_items = results[start : start + size]
+
+    if enrich:
+        copies = [item.copy() for item in page_items]
+        page_items = list(await asyncio.gather(*[_enrich(c) for c in copies]))
+
+    return {
+        "items": [item.copy() for item in page_items],
+        "page": page,
+        "size": size,
+        "total": total,
+        "total_pages": total_pages,
+    }
+
+
+@app.get("/concept/{concept_id}", response_model=Concept, tags=["Library"])
+async def get_concept(
+    concept_id: str,
+    enrich: bool = Query(True),
+):
+    """Get a single concept by ID."""
+    record = next((c for c in _all_concepts() if c.get("id") == concept_id), None)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Concept '{concept_id}' not found.")
+    obj = record.copy()
+    if enrich:
+        obj = await _enrich(obj)
+    return obj
+
+
+@app.get("/concept/random", response_model=Concept, tags=["Library"])
+async def random_concept(
+    type: Optional[str] = Query(None, description="bias | fallacy | mental_model"),
+    enrich: bool = Query(True),
+):
+    """Return a random concept — useful for 'bias of the day'."""
+    pool = _all_concepts()
+    if type:
+        pool = [c for c in pool if c.get("type") == type.lower()]
+    if not pool:
+        raise HTTPException(status_code=503, detail="No data loaded.")
+    obj = random.choice(pool).copy()
+    if enrich:
+        obj = await _enrich(obj)
+    return obj
+
+
+@app.get("/categories", response_model=List[CategoryStat], tags=["Library"])
+def get_categories(
+    type: Optional[str] = Query(None, description="bias | fallacy | mental_model"),
+):
+    """Return all categories with their concept counts."""
+    pool = _all_concepts()
+    if type:
+        pool = [c for c in pool if c.get("type") == type.lower()]
+
+    cat_map: Dict[str, int] = {}
+    for c in pool:
+        cat = c.get("category", "").strip()
+        if cat:
+            cat_map[cat] = cat_map.get(cat, 0) + 1
+
+    return [
+        CategoryStat(category=cat, count=count)
+        for cat, count in sorted(cat_map.items())
+    ]
+
+
+@app.get("/stats", response_model=StatsResponse, tags=["System"])
+def get_stats():
+    """High-level dataset statistics."""
+    return StatsResponse(
+        total_biases=len(_biases),
+        total_fallacies=len(_fallacies),
+        total_mental_models=len(_mental_models),
+        total_concepts=len(_biases) + len(_fallacies) + len(_mental_models),
+        ai_backend=_detect_ai_backend(),
+    )
+
+
+@app.get("/health", tags=["System"])
+def health_check():
+    return {
+        "status": "ok",
+        "biases": len(_biases),
+        "fallacies": len(_fallacies),
+        "mental_models": len(_mental_models),
+        "ai_backend": _detect_ai_backend(),
+    }
+
+
+# ── AR Scanner ────────────────────────────────────────────────────────────────
+
+@app.post("/analyze", response_model=AnalyzeResponse, tags=["Scanner"])
+async def analyze_scene(req: AnalyzeRequest):
+    """
+    Analyze a base64-encoded camera frame for cognitive biases.
+
+    Backend priority:
+    1. Anthropic Claude (vision — if ANTHROPIC_API_KEY is set)
+    2. Local LLM at localhost:1234 (text-only fallback, no image analysis)
+    """
+    if req.media_type not in _ALLOWED_MEDIA:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported media_type '{req.media_type}'. Allowed: {sorted(_ALLOWED_MEDIA)}",
+        )
+    if len(req.image) > _MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image too large (max 4 MB base64).")
+
+    backend_used = "none"
+    data: Optional[dict] = None
+
+    # 1. Try Anthropic (vision)
+    data = await _try_anthropic(req.image, req.media_type)
+    if data:
+        backend_used = "anthropic"
+    else:
+        # 2. Try local LLM (text-only)
+        data = await _try_local_llm()
+        if data:
+            backend_used = "local_llm"
+
+    if data is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No AI backend available. "
+                "Set ANTHROPIC_API_KEY for vision analysis, "
+                "or ensure local LLM is running at localhost:1234."
+            ),
+        )
+
+    # Enrich each detected item with local database info
     detected: List[DetectedConcept] = []
     for item in data.get("biases", [])[:5]:
         name = item.get("name", "").strip()
         if not name:
             continue
-        local = _match_local_bias(name)
+        local = _match_concept(name)
         detected.append(DetectedConcept(
             name=name,
             reason=item.get("reason", ""),
             confidence=item.get("confidence", "medium"),
+            type=local.get("type", "bias") if local else "bias",
             category=local.get("category") if local else None,
             subcategory=local.get("subcategory") if local else None,
             url=local.get("url") if local else None,
@@ -526,24 +569,23 @@ async def analyze_scene(req: AnalyzeRequest):
     return AnalyzeResponse(
         scene=data.get("scene", ""),
         detected=detected,
+        backend_used=backend_used,
     )
 
 
-# --- Camera UI ---
+# ── Serve UI ──────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=FileResponse, include_in_schema=False)
-async def serve_camera_ui():
-    """Serve the AR camera scanner UI."""
+async def serve_ui():
     path = Path("static/index.html")
     if not path.exists():
-        raise HTTPException(status_code=404, detail="Camera UI not built yet.")
+        raise HTTPException(status_code=404, detail="UI not found.")
     return FileResponse(path)
 
 
-# Mount static assets — must be AFTER all route definitions
-_static_dir = Path("static")
-if _static_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+_static = Path("static")
+if _static.exists():
+    app.mount("/static", StaticFiles(directory=str(_static)), name="static")
 
 
 if __name__ == "__main__":

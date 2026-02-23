@@ -1,706 +1,363 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#080810">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Bias Scanner — Cognitive Bias Codex</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cognitive Bias Codex</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: { primary: "#1337ec", bg: "#101322", surface: "#171b2f" },
+          fontFamily: { sans: ["Inter", "sans-serif"] },
+        },
+      },
+    };
+  </script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:         #080810;
-      --surface:    rgba(8, 10, 28, 0.96);
-      --cyan:       #00e5ff;
-      --cyan-dim:   rgba(0, 229, 255, 0.18);
-      --purple:     #7c4dff;
-      --purple-dim: rgba(124, 77, 255, 0.25);
-      --text:       #dde4ff;
-      --text-dim:   #7888aa;
-      --green:      #00e676;
-      --amber:      #ffab40;
-      --gray:       #546e7a;
-      --card-bg:    rgba(6, 8, 24, 0.97);
-    }
-
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      overflow: hidden;
-    }
-
-    /* ── App shell ─────────────────────────────────── */
-    #app {
-      display: flex;
-      flex-direction: column;
-      height: 100dvh;
-      height: 100vh; /* fallback */
-    }
-
-    /* ── Header ────────────────────────────────────── */
-    #header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 16px;
-      padding-top: max(10px, env(safe-area-inset-top));
-      background: rgba(4, 4, 16, 0.9);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(0, 229, 255, 0.12);
-      flex-shrink: 0;
-      z-index: 20;
-    }
-
-    #header h1 {
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      color: var(--cyan);
-      text-transform: uppercase;
-    }
-
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .status-pill {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      color: var(--text-dim);
-      letter-spacing: 0.5px;
-    }
-
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--gray);
-      transition: background 0.3s, box-shadow 0.3s;
-    }
-
-    .status-dot.active {
-      background: var(--green);
-      box-shadow: 0 0 8px var(--green);
-    }
-
-    /* ── Main area (camera + sidebar on desktop) ───── */
-    #main-area {
-      flex: 1;
-      display: flex;
-      overflow: hidden;
-      min-height: 0;
-    }
-
-    /* ── Camera viewport ────────────────────────────── */
-    #camera-wrap {
-      position: relative;
-      flex: 1;
-      background: #000;
-      overflow: hidden;
-    }
-
-    #video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    /* ── HUD overlay ────────────────────────────────── */
-    #hud {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-
-    .corner {
-      position: absolute;
-      width: 28px;
-      height: 28px;
-      border-color: var(--cyan);
-      border-style: solid;
-      opacity: 0.5;
-      transition: opacity 0.3s, box-shadow 0.3s;
-    }
-
-    .corner.tl { top: 18px;  left: 18px;  border-width: 2px 0 0 2px; }
-    .corner.tr { top: 18px;  right: 18px; border-width: 2px 2px 0 0; }
-    .corner.bl { bottom: 18px; left: 18px;  border-width: 0 0 2px 2px; }
-    .corner.br { bottom: 18px; right: 18px; border-width: 0 2px 2px 0; }
-
-    /* Scan-line animation */
-    .scan-line {
-      position: absolute;
-      left: 0; right: 0;
-      top: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent 0%, var(--cyan) 50%, transparent 100%);
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    @keyframes sweep {
-      0%   { top: 0%;   opacity: 0.9; }
-      90%  { top: 95%;  opacity: 0.9; }
-      100% { top: 100%; opacity: 0;   }
-    }
-
-    #camera-wrap.scanning .scan-line {
-      animation: sweep 1.6s ease-in-out infinite;
-    }
-
-    #camera-wrap.scanning .corner {
-      opacity: 1;
-      animation: corner-pulse 0.6s ease-in-out infinite alternate;
-    }
-
-    @keyframes corner-pulse {
-      from { opacity: 0.7; }
-      to   { opacity: 1; box-shadow: 0 0 10px var(--cyan); }
-    }
-
-    /* ── No-camera placeholder ──────────────────────── */
-    #no-camera {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-      text-align: center;
-      padding: 32px;
-      background: rgba(0, 0, 0, 0.6);
-    }
-
-    #no-camera .big-icon { font-size: 52px; line-height: 1; }
-
-    #no-camera p {
-      color: var(--text-dim);
-      font-size: 14px;
-      line-height: 1.65;
-      max-width: 280px;
-    }
-
-    #no-camera .hint {
-      font-size: 11px;
-      color: #3d4a5e;
-      max-width: 260px;
-    }
-
-    /* ── Results sidebar (desktop) / panel (mobile) ─── */
-    #results-panel {
-      background: var(--surface);
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-
-      /* Mobile: fixed height panel below camera */
-      max-height: 50vh;
-      width: 100%;
-      border-top: 1px solid rgba(0, 229, 255, 0.15);
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-    }
-
-    #results-panel.hidden { display: none; }
-
-    .panel-title {
-      padding: 10px 14px 6px;
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1.8px;
-      color: var(--cyan);
-      opacity: 0.65;
-      flex-shrink: 0;
-    }
-
-    #scene-desc {
-      padding: 0 14px 6px;
-      font-size: 12px;
-      color: var(--text-dim);
-      font-style: italic;
-      line-height: 1.5;
-    }
-
-    .cards-list {
-      padding: 0 10px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-    }
-
-    /* ── Bias card ───────────────────────────────────── */
-    .bias-card {
-      background: var(--card-bg);
-      border: 1px solid rgba(0, 229, 255, 0.13);
-      border-radius: 10px;
-      padding: 11px 13px;
-      animation: card-in 0.28s ease-out both;
-    }
-
-    .bias-card:nth-child(1) { animation-delay: 0.00s; }
-    .bias-card:nth-child(2) { animation-delay: 0.06s; }
-    .bias-card:nth-child(3) { animation-delay: 0.12s; }
-    .bias-card:nth-child(4) { animation-delay: 0.18s; }
-    .bias-card:nth-child(5) { animation-delay: 0.24s; }
-
-    @keyframes card-in {
-      from { transform: translateY(16px); opacity: 0; }
-      to   { transform: translateY(0);    opacity: 1; }
-    }
-
-    .card-row {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      margin-bottom: 5px;
-    }
-
-    .bias-name {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text);
-      flex: 1;
-      line-height: 1.3;
-    }
-
-    .cat-badge {
-      font-size: 9px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 8px;
-      background: var(--purple-dim);
-      border: 1px solid rgba(124, 77, 255, 0.35);
-      color: #b39ddb;
-      white-space: nowrap;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
-
-    .conf-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .conf-dot.high   { background: var(--green); box-shadow: 0 0 5px var(--green); }
-    .conf-dot.medium { background: var(--amber); }
-    .conf-dot.low    { background: var(--gray); }
-
-    .bias-reason {
-      font-size: 12px;
-      color: var(--text-dim);
-      line-height: 1.55;
-    }
-
-    .learn-link {
-      display: inline-block;
-      margin-top: 5px;
-      font-size: 11px;
-      color: var(--cyan);
-      opacity: 0.55;
-      text-decoration: none;
-      transition: opacity 0.2s;
-    }
-
-    .learn-link:hover { opacity: 1; }
-
-    /* State messages */
-    .state-msg {
-      padding: 20px 16px;
-      text-align: center;
-      color: var(--text-dim);
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    .state-msg .emoji { font-size: 28px; display: block; margin-bottom: 8px; }
-
-    /* Loading dots */
-    .loading-dots::after {
-      content: '';
-      animation: dots 1.4s steps(4, end) infinite;
-    }
-
-    @keyframes dots {
-      0%   { content: ''; }
-      25%  { content: '.'; }
-      50%  { content: '..'; }
-      75%  { content: '...'; }
-    }
-
-    /* ── Bottom bar ─────────────────────────────────── */
-    #bottom-bar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      padding-bottom: max(10px, env(safe-area-inset-bottom));
-      background: rgba(4, 4, 16, 0.95);
-      border-top: 1px solid rgba(0, 229, 255, 0.1);
-      flex-shrink: 0;
-    }
-
-    #scan-btn {
-      flex: 1;
-      height: 50px;
-      border: none;
-      border-radius: 13px;
-      background: var(--cyan);
-      color: #000;
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: transform 0.13s, opacity 0.2s, background 0.2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    #scan-btn:active:not(:disabled) { transform: scale(0.965); }
-
-    #scan-btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-
-    #scan-btn.analyzing {
-      background: var(--cyan-dim);
-      color: var(--cyan);
-      border: 1px solid rgba(0, 229, 255, 0.3);
-    }
-
+    body { font-family: "Inter", sans-serif; background: #101322; color: #e2e8f0; }
+    .glass { background: rgba(16,19,34,0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+    .glass-card { background: linear-gradient(145deg, rgba(23,27,47,0.6) 0%, rgba(16,19,34,0.8) 100%); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.05); }
+    .no-scroll::-webkit-scrollbar { display: none; }
+    .no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: flex; flex-direction: column; flex: 1; }
+    #videoEl { width: 100%; height: 100%; object-fit: cover; border-radius: 0.75rem; }
+    #canvasEl { display: none; }
+    .conf-high   { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+    .conf-medium { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+    .conf-low    { background: rgba(239,68,68,0.15);   color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+    .type-bias         { background: rgba(19,55,236,0.15);  color: #6ea0ff; border: 1px solid rgba(19,55,236,0.3); }
+    .type-fallacy      { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
+    .type-mental_model { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    .spinner {
-      width: 17px;
-      height: 17px;
-      border: 2px solid rgba(0, 229, 255, 0.25);
-      border-top-color: var(--cyan);
-      border-radius: 50%;
-      animation: spin 0.75s linear infinite;
-    }
-
-    #clear-btn {
-      width: 50px;
-      height: 50px;
-      border-radius: 13px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text-dim);
-      font-size: 17px;
-      cursor: pointer;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    #clear-btn:hover { background: rgba(255, 255, 255, 0.09); }
-    #clear-btn.visible { display: flex; }
-
-    /* ── Desktop / landscape layout ─────────────────── */
-    @media (min-width: 768px) {
-      #app { flex-direction: column; max-width: 1100px; margin: 0 auto; }
-
-      #main-area { flex-direction: row; flex: 1; min-height: 0; }
-
-      #camera-wrap { flex: 1; min-width: 0; }
-
-      #results-panel {
-        width: 340px;
-        max-height: none;
-        height: auto;
-        border-top: none;
-        border-left: 1px solid rgba(0, 229, 255, 0.15);
-        flex-shrink: 0;
-      }
-    }
-
-    /* Tablet portrait */
-    @media (min-width: 540px) and (max-width: 767px) {
-      #results-panel { max-height: 45vh; }
-    }
+    .spinner { animation: spin 0.8s linear infinite; }
+    .glow-tl { position:fixed; top:-10%; left:-20%; width:80%; height:40%; border-radius:50%; background:rgba(19,55,236,0.18); filter:blur(100px); pointer-events:none; z-index:0; }
+    .glow-br { position:fixed; bottom:-10%; right:-20%; width:60%; height:40%; border-radius:50%; background:rgba(19,55,236,0.08); filter:blur(80px); pointer-events:none; z-index:0; }
   </style>
 </head>
-<body>
-  <div id="app">
 
-    <!-- Header -->
-    <div id="header">
-      <h1>🧠 Bias Scanner</h1>
-      <div class="header-right">
-        <div class="status-pill">
-          <div class="status-dot" id="status-dot"></div>
-          <span id="status-label">Offline</span>
+<body class="min-h-screen overflow-hidden">
+  <div class="glow-tl"></div>
+  <div class="glow-br"></div>
+
+  <div class="max-w-md mx-auto min-h-screen flex flex-col relative z-10 pb-20">
+
+    <!-- ── LIBRARY TAB ──────────────────────────────────────────────────── -->
+    <div id="tab-library" class="tab-panel active">
+      <header class="sticky top-0 z-50 glass px-5 pt-12 pb-4 rounded-b-xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">Cognitive Bias Codex</p>
+            <h1 class="text-xl font-bold text-white">Library</h1>
+          </div>
+          <div class="text-right text-xs text-slate-400 font-mono">
+            <span id="totalCount">—</span> concepts
+          </div>
         </div>
+        <div class="relative mb-3">
+          <span class="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-primary text-sm">search</span>
+          <input id="searchInput"
+            class="block w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/5 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+            placeholder="Search biases, fallacies, models…" type="text" />
+        </div>
+        <div class="flex gap-2 overflow-x-auto no-scroll">
+          <button data-filter="" class="filter-btn flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-medium bg-primary text-white border border-primary">All</button>
+          <button data-filter="bias" class="filter-btn flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-medium bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10">Biases</button>
+          <button data-filter="fallacy" class="filter-btn flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-medium bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10">Fallacies</button>
+          <button data-filter="mental_model" class="filter-btn flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-medium bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10">Mental Models</button>
+        </div>
+      </header>
+      <main class="flex-1 overflow-y-auto px-4 pt-4 space-y-3" id="conceptList">
+        <div class="flex items-center justify-center py-12">
+          <div class="w-6 h-6 rounded-full border-2 border-primary border-t-transparent spinner"></div>
+        </div>
+      </main>
+      <div class="px-4 pb-4 pt-2">
+        <button id="loadMoreBtn" class="hidden w-full py-2.5 rounded-lg text-sm font-medium text-primary border border-primary/30 hover:bg-primary/10 transition-all">Load more</button>
       </div>
     </div>
 
-    <!-- Main area -->
-    <div id="main-area">
-
-      <!-- Camera -->
-      <div id="camera-wrap">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="capture-canvas" style="display:none"></canvas>
-
-        <!-- HUD -->
-        <div id="hud">
-          <div class="scan-line"></div>
-          <div class="corner tl"></div>
-          <div class="corner tr"></div>
-          <div class="corner bl"></div>
-          <div class="corner br"></div>
+    <!-- ── SCAN TAB ──────────────────────────────────────────────────────── -->
+    <div id="tab-scan" class="tab-panel">
+      <header class="glass px-5 pt-12 pb-4 rounded-b-xl">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">AR Scanner</p>
+            <h1 class="text-xl font-bold text-white">Scan Scene</h1>
+          </div>
+          <div id="backendBadge" class="text-[10px] font-mono px-2 py-1 rounded bg-white/5 text-slate-400 border border-white/10">detecting…</div>
         </div>
-
-        <!-- No-camera placeholder -->
-        <div id="no-camera">
-          <div class="big-icon">📷</div>
-          <p>Point your camera at your environment — ads, screens, meetings, storefronts, social media — and let AI surface the cognitive biases at play.</p>
-          <p class="hint">Camera access required &nbsp;·&nbsp; Works best over HTTPS on mobile</p>
+      </header>
+      <main class="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4">
+        <div class="relative rounded-xl overflow-hidden bg-white/5 border border-white/10" style="height:260px;">
+          <video id="videoEl" autoplay playsinline muted></video>
+          <canvas id="canvasEl"></canvas>
+          <div id="camPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
+            <span class="material-icons-round text-4xl mb-2">videocam_off</span>
+            <span class="text-xs">Camera off</span>
+          </div>
+          <div id="scanOverlay" class="hidden absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
+            <div class="flex flex-col items-center">
+              <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent spinner mb-2"></div>
+              <span class="text-xs text-primary font-medium">Analyzing…</span>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <!-- Results panel -->
-      <div id="results-panel" class="hidden"></div>
-
-    </div>
-
-    <!-- Bottom bar -->
-    <div id="bottom-bar">
-      <button id="scan-btn" onclick="handleScan()">
-        <span id="btn-inner">📷&nbsp; Start Camera</span>
-      </button>
-      <button id="clear-btn" onclick="clearResults()" title="Clear results">✕</button>
+        <div class="flex gap-3">
+          <button id="startCamBtn" class="flex-1 py-2.5 rounded-lg text-sm font-medium bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 flex items-center justify-center gap-2 transition-all">
+            <span class="material-icons-round text-base">videocam</span>Start Camera
+          </button>
+          <button id="scanBtn" disabled class="flex-1 py-2.5 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2 transition-all" style="background:#1337ec;opacity:0.4;">
+            <span class="material-icons-round text-base">radar</span>Scan
+          </button>
+        </div>
+        <div id="scanResults" class="space-y-3 hidden">
+          <div id="sceneDesc" class="glass-card rounded-xl p-3 text-xs text-slate-300 leading-relaxed italic"></div>
+          <div id="resultsList" class="space-y-2"></div>
+          <div id="backendNote" class="text-[10px] text-slate-600 text-center mt-1"></div>
+        </div>
+        <div id="scanError" class="hidden glass-card rounded-xl p-4 text-sm text-rose-400 border border-rose-500/20"></div>
+      </main>
     </div>
 
   </div>
 
+  <!-- ── BOTTOM NAV ─────────────────────────────────────────────────────── -->
+  <nav class="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 z-50 glass border-t border-white/5 pb-6 pt-3 px-8">
+    <ul class="flex justify-around items-center">
+      <li>
+        <button onclick="switchTab('library')" id="nav-library" class="nav-btn flex flex-col items-center">
+          <span class="material-icons-round text-primary text-2xl">auto_stories</span>
+          <span class="text-[10px] font-medium text-white mt-0.5">Library</span>
+        </button>
+      </li>
+      <li>
+        <button onclick="switchTab('scan')" id="nav-scan" class="nav-btn flex flex-col items-center">
+          <span class="material-icons-round text-slate-500 text-2xl">radar</span>
+          <span class="text-[10px] font-medium text-slate-500 mt-0.5">Scan</span>
+        </button>
+      </li>
+    </ul>
+  </nav>
+
   <script>
-    // ── State ─────────────────────────────────────────
-    let camState = 'idle';   // idle | ready | analyzing
-    let mediaStream = null;
+  // ── state ──────────────────────────────────────────────────────────────────
+  const S = { page:1, size:20, term:"", type:"", loading:false, hasMore:true, stream:null };
 
-    const video        = document.getElementById('video');
-    const noCamera     = document.getElementById('no-camera');
-    const cameraWrap   = document.getElementById('camera-wrap');
-    const resultsPanel = document.getElementById('results-panel');
-    const statusDot    = document.getElementById('status-dot');
-    const statusLabel  = document.getElementById('status-label');
-    const scanBtn      = document.getElementById('scan-btn');
-    const btnInner     = document.getElementById('btn-inner');
-    const clearBtn     = document.getElementById('clear-btn');
+  // ── tab switching ──────────────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    document.getElementById("tab-" + name).classList.add("active");
 
-    // ── Camera init ───────────────────────────────────
-    async function startCamera() {
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width:  { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-          audio: false,
-        });
+    const tabs = { library: "nav-library", scan: "nav-scan" };
+    Object.entries(tabs).forEach(([t, id]) => {
+      const btn  = document.getElementById(id);
+      const icon = btn.querySelector(".material-icons-round");
+      const lbl  = btn.querySelector("span:last-child");
+      const active = t === name;
+      icon.className = "material-icons-round text-2xl " + (active ? "text-primary" : "text-slate-500");
+      lbl.className  = "text-[10px] font-medium mt-0.5 " + (active ? "text-white" : "text-slate-500");
+    });
+  }
 
-        video.srcObject = mediaStream;
-        await video.play();
-        noCamera.style.display = 'none';
-        setStatus('ready');
-
-      } catch (err) {
-        console.error('Camera error:', err);
-        noCamera.innerHTML = `
-          <div class="big-icon">⚠️</div>
-          <p>${cameraErrorMessage(err)}</p>
-        `;
-        setStatus('idle');
-      }
-    }
-
-    function cameraErrorMessage(err) {
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')
-        return 'Camera permission was denied.<br>Please allow access in your browser settings and reload.';
-      if (err.name === 'NotFoundError')
-        return 'No camera found on this device.';
-      if (err.name === 'NotReadableError')
-        return 'Camera is already in use by another app.';
-      if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1')
-        return 'Camera requires HTTPS.<br>Please open this page over a secure connection.';
-      return `Camera unavailable: ${err.message}`;
-    }
-
-    // ── Frame capture ─────────────────────────────────
-    function captureBase64() {
-      const canvas = document.getElementById('capture-canvas');
-      canvas.width  = video.videoWidth  || 1280;
-      canvas.height = video.videoHeight || 720;
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      // JPEG at 82% — good quality, manageable size (~200–400 KB)
-      return canvas.toDataURL('image/jpeg', 0.82).split(',')[1];
-    }
-
-    // ── API call ──────────────────────────────────────
-    async function analyzeImage(base64) {
-      const resp = await fetch('/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, media_type: 'image/jpeg' }),
+  // ── filter buttons ─────────────────────────────────────────────────────────
+  document.querySelectorAll(".filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".filter-btn").forEach(b => {
+        b.className = b.className
+          .replace("bg-primary text-white border-primary", "")
+          + " bg-white/5 text-slate-300 border-white/10";
       });
+      btn.className = btn.className
+        .replace("bg-white/5 text-slate-300 border-white/10", "")
+        + " bg-primary text-white border-primary";
+      S.type = btn.dataset.filter;
+      resetAndLoad();
+    });
+  });
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ detail: `HTTP ${resp.status}` }));
-        throw new Error(err.detail || `Server error ${resp.status}`);
+  // ── search ─────────────────────────────────────────────────────────────────
+  let searchTimer;
+  document.getElementById("searchInput").addEventListener("input", e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { S.term = e.target.value.trim(); resetAndLoad(); }, 320);
+  });
+
+  // ── concept list ───────────────────────────────────────────────────────────
+  function resetAndLoad() {
+    S.page = 1; S.hasMore = true;
+    document.getElementById("conceptList").innerHTML =
+      `<div class="flex items-center justify-center py-12"><div class="w-6 h-6 rounded-full border-2 border-primary border-t-transparent spinner"></div></div>`;
+    loadPage(true);
+  }
+
+  async function loadPage(replace = false) {
+    if (S.loading || (!S.hasMore && !replace)) return;
+    S.loading = true;
+    document.getElementById("loadMoreBtn").classList.add("hidden");
+
+    const p = new URLSearchParams({ page: S.page, size: S.size });
+    if (S.term) p.set("term", S.term);
+    if (S.type) p.set("type", S.type);
+
+    try {
+      const res  = await fetch(`/search?${p}`);
+      const data = await res.json();
+      if (replace) document.getElementById("conceptList").innerHTML = "";
+      if (data.items.length === 0 && replace) {
+        document.getElementById("conceptList").innerHTML =
+          `<p class="text-center text-sm text-slate-500 py-12">No results found.</p>`;
       }
-      return resp.json();
+      data.items.forEach(c => document.getElementById("conceptList").appendChild(conceptCard(c)));
+      S.page++;
+      S.hasMore = S.page <= data.total_pages;
+      document.getElementById("loadMoreBtn").classList.toggle("hidden", !S.hasMore);
+    } catch (_) {
+      if (replace)
+        document.getElementById("conceptList").innerHTML =
+          `<p class="text-center text-sm text-rose-400 py-12">Failed to load. Is the server running?</p>`;
+    } finally {
+      S.loading = false;
     }
+  }
 
-    // ── Main flow ─────────────────────────────────────
-    async function handleScan() {
-      if (camState === 'idle') {
-        await startCamera();
-        return;
-      }
-      if (camState !== 'ready') return;
+  document.getElementById("loadMoreBtn").addEventListener("click", () => loadPage());
 
-      setStatus('analyzing');
-      cameraWrap.classList.add('scanning');
-      showLoading();
-
-      try {
-        const base64 = captureBase64();
-        const data   = await analyzeImage(base64);
-        renderResults(data);
-        clearBtn.classList.add('visible');
-      } catch (err) {
-        showError(err.message);
-        clearBtn.classList.add('visible');
-      } finally {
-        setStatus('ready');
-        cameraWrap.classList.remove('scanning');
-      }
-    }
-
-    // ── UI state helpers ──────────────────────────────
-    function setStatus(state) {
-      camState = state;
-      statusDot.className = 'status-dot' + (state !== 'idle' ? ' active' : '');
-
-      switch (state) {
-        case 'idle':
-          statusLabel.textContent = 'Offline';
-          btnInner.innerHTML = '📷&nbsp; Start Camera';
-          scanBtn.disabled = false;
-          scanBtn.classList.remove('analyzing');
-          break;
-        case 'ready':
-          statusLabel.textContent = 'Live';
-          btnInner.innerHTML = '⚡&nbsp; Scan Scene';
-          scanBtn.disabled = false;
-          scanBtn.classList.remove('analyzing');
-          break;
-        case 'analyzing':
-          statusLabel.textContent = 'Scanning';
-          btnInner.innerHTML = '<div class="spinner"></div>&nbsp; Analyzing<span class="loading-dots"></span>';
-          scanBtn.disabled = true;
-          scanBtn.classList.add('analyzing');
-          break;
-      }
-    }
-
-    function showPanel() {
-      resultsPanel.classList.remove('hidden');
-    }
-
-    function showLoading() {
-      showPanel();
-      resultsPanel.innerHTML = `
-        <div class="state-msg">
-          <span class="emoji">🔍</span>
-          Sending frame to Claude<span class="loading-dots"></span>
-        </div>`;
-    }
-
-    function showError(msg) {
-      showPanel();
-      const isKeyError = msg.toLowerCase().includes('anthropic_api_key');
-      resultsPanel.innerHTML = `
-        <div class="state-msg">
-          <span class="emoji">⚠️</span>
-          <strong>${isKeyError ? 'API key not configured' : 'Scan failed'}</strong><br>
-          <span style="font-size:12px">${esc(msg)}</span>
-          ${isKeyError
-            ? '<br><br><span style="font-size:11px;color:#3d4a5e">Set the <code>ANTHROPIC_API_KEY</code> environment variable and restart the server.</span>'
-            : ''}
-        </div>`;
-    }
-
-    // ── Results rendering ─────────────────────────────
-    function renderResults(data) {
-      showPanel();
-      const { scene, detected } = data;
-
-      if (!detected || detected.length === 0) {
-        resultsPanel.innerHTML = `
-          ${scene ? `<div class="panel-title">Scene</div><div id="scene-desc">"${esc(scene)}"</div>` : ''}
-          <div class="state-msg">
-            <span class="emoji">✅</span>
-            No clear cognitive biases detected in this scene.
-          </div>`;
-        return;
-      }
-
-      const cards = detected.map(b => `
-        <div class="bias-card">
-          <div class="card-row">
-            <span class="bias-name">${esc(b.name)}</span>
-            ${b.category ? `<span class="cat-badge">${esc(b.category)}</span>` : ''}
-            <span class="conf-dot ${esc(b.confidence)}" title="${esc(b.confidence)} confidence"></span>
-          </div>
-          <div class="bias-reason">${esc(b.reason)}</div>
-          ${b.url ? `<a class="learn-link" href="${esc(b.url)}" target="_blank" rel="noopener noreferrer">Learn more →</a>` : ''}
+  function conceptCard(c) {
+    const typePill = `type-${c.type}`;
+    const typeLabel = c.type.replace("_", " ").toUpperCase();
+    const desc = c.description
+      ? c.description.replace(/</g,"&lt;").replace(/>/g,"&gt;").slice(0,130) + (c.description.length > 130 ? "…" : "")
+      : "No description available.";
+    const el = document.createElement("article");
+    el.className = "glass-card rounded-xl p-4 relative overflow-hidden group hover:border-primary/40 transition-colors";
+    el.innerHTML = `
+      <div class="flex items-start justify-between mb-1.5">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-mono border ${typePill}">${typeLabel}</span>
+          ${c.category ? `<span class="text-[10px] text-slate-500 font-mono truncate max-w-[140px]">${c.category}</span>` : ""}
         </div>
-      `).join('');
+        ${c.url ? `<a href="${c.url}" target="_blank" rel="noopener" class="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-primary transition-colors" onclick="event.stopPropagation()"><span class="material-icons-round text-sm">open_in_new</span></a>` : ""}
+      </div>
+      <h3 class="text-base font-bold text-white group-hover:text-primary transition-colors mb-1.5">${c.name}</h3>
+      <p class="text-xs text-slate-400 leading-relaxed">${desc}</p>`;
+    return el;
+  }
 
-      resultsPanel.innerHTML = `
-        <div class="panel-title">Detected Biases &nbsp;(${detected.length})</div>
-        ${scene ? `<div id="scene-desc">"${esc(scene)}"</div>` : ''}
-        <div class="cards-list">${cards}</div>`;
-    }
+  // ── stats ──────────────────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const data = await (await fetch("/stats")).json();
+      document.getElementById("totalCount").textContent = data.total_concepts.toLocaleString();
+      const badge = document.getElementById("backendBadge");
+      if (data.ai_backend.includes("anthropic")) {
+        badge.textContent = "vision AI ready";
+        badge.style.color = "#10b981";
+      } else {
+        badge.textContent = "local LLM only";
+        badge.style.color = "#f59e0b";
+      }
+    } catch (_) {}
+  }
 
-    function clearResults() {
-      resultsPanel.innerHTML = '';
-      resultsPanel.classList.add('hidden');
-      clearBtn.classList.remove('visible');
-    }
+  // ── camera ─────────────────────────────────────────────────────────────────
+  const video   = document.getElementById("videoEl");
+  const canvas  = document.getElementById("canvasEl");
+  const scanBtn = document.getElementById("scanBtn");
+  const startBtn = document.getElementById("startCamBtn");
 
-    // ── Utilities ─────────────────────────────────────
-    function esc(s) {
-      if (!s) return '';
-      return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+  startBtn.addEventListener("click", async () => {
+    if (S.stream) {
+      S.stream.getTracks().forEach(t => t.stop());
+      S.stream = null; video.srcObject = null;
+      document.getElementById("camPlaceholder").classList.remove("hidden");
+      startBtn.innerHTML = `<span class="material-icons-round text-base">videocam</span>Start Camera`;
+      scanBtn.disabled = true; scanBtn.style.opacity = "0.4";
+      return;
     }
+    try {
+      S.stream = await navigator.mediaDevices.getUserMedia(
+        { video: { facingMode: "environment", width: {ideal:1280}, height: {ideal:720} } }
+      );
+      video.srcObject = S.stream;
+      document.getElementById("camPlaceholder").classList.add("hidden");
+      startBtn.innerHTML = `<span class="material-icons-round text-base">videocam_off</span>Stop`;
+      scanBtn.disabled = false; scanBtn.style.opacity = "1";
+    } catch (_) { showScanError("Camera access denied. Please allow camera permissions."); }
+  });
+
+  scanBtn.addEventListener("click", async () => {
+    if (!S.stream) return;
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    const b64 = canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
+
+    document.getElementById("scanOverlay").classList.remove("hidden");
+    document.getElementById("scanResults").classList.add("hidden");
+    document.getElementById("scanError").classList.add("hidden");
+    scanBtn.disabled = true;
+
+    try {
+      const res  = await fetch("/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: b64, media_type: "image/jpeg" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Analysis failed.");
+      renderResults(data);
+    } catch (e) { showScanError(e.message); }
+    finally {
+      document.getElementById("scanOverlay").classList.add("hidden");
+      scanBtn.disabled = false;
+    }
+  });
+
+  function renderResults(data) {
+    document.getElementById("sceneDesc").textContent = data.scene || "Scene analyzed.";
+    const list = document.getElementById("resultsList");
+    list.innerHTML = "";
+    if (!data.detected || data.detected.length === 0) {
+      list.innerHTML = `<p class="text-center text-sm text-slate-500 py-4">No biases clearly evidenced in this scene.</p>`;
+    } else {
+      data.detected.forEach(d => {
+        const card = document.createElement("div");
+        card.className = "glass-card rounded-xl p-3 space-y-1.5";
+        card.innerHTML = `
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-bold text-white text-sm">${d.name}</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono border conf-${d.confidence || "medium"}">${d.confidence || "medium"}</span>
+            ${d.type ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono border type-${d.type}">${d.type.replace("_"," ")}</span>` : ""}
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">${d.reason}</p>
+          ${d.category ? `<p class="text-[10px] text-slate-600 font-mono">${d.category}${d.subcategory ? " › " + d.subcategory : ""}</p>` : ""}
+          ${d.url ? `<a href="${d.url}" target="_blank" rel="noopener" class="text-[10px] text-primary hover:underline flex items-center gap-1"><span class="material-icons-round text-xs">open_in_new</span>Learn more</a>` : ""}`;
+        list.appendChild(card);
+      });
+    }
+    document.getElementById("backendNote").textContent =
+      data.backend_used === "local_llm" ? "⚠ Text-only (local LLM — image not processed)"
+      : data.backend_used === "anthropic" ? "✓ Vision analysis via Anthropic Claude" : "";
+    document.getElementById("scanResults").classList.remove("hidden");
+  }
+
+  function showScanError(msg) {
+    const el = document.getElementById("scanError");
+    el.textContent = msg;
+    el.classList.remove("hidden");
+  }
+
+  // init
+  loadStats();
+  loadPage(true);
   </script>
 </body>
 </html>
