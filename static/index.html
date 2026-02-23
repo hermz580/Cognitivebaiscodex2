@@ -22,643 +22,1006 @@
   </script>
   <style>
     body { font-family: "Inter", sans-serif; background: #101322; color: #e2e8f0; }
-    .glass { background: rgba(16,19,34,0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
-    .glass-card { background: linear-gradient(145deg, rgba(23,27,47,0.6) 0%, rgba(16,19,34,0.8) 100%); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.05); }
+
+    /* glass surfaces */
+    .glass {
+      background: rgba(16,19,34,0.7);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .glass-card {
+      background: linear-gradient(145deg, rgba(23,27,47,0.65) 0%, rgba(16,19,34,0.85) 100%);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* scrollbar hide */
     .no-scroll::-webkit-scrollbar { display: none; }
     .no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* tab system */
     .tab-panel { display: none; }
-    .tab-panel.active { display: flex; flex-direction: column; flex: 1; }
+    .tab-panel.active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+    /* camera */
     #videoEl { width: 100%; height: 100%; object-fit: cover; border-radius: 0.75rem; }
     #canvasEl { display: none; }
-    .conf-high   { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
-    .conf-medium { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
-    .conf-low    { background: rgba(239,68,68,0.15);   color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
-    .type-bias         { background: rgba(19,55,236,0.15);  color: #6ea0ff; border: 1px solid rgba(19,55,236,0.3); }
-    .type-fallacy      { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
-    .type-mental_model { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+
+    /* confidence / type pills */
+    .conf-high   { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
+    .conf-medium { background: rgba(245,158,11,0.12);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+    .conf-low    { background: rgba(239,68,68,0.12);   color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+    .type-bias         { background: rgba(19,55,236,0.12);  color: #6ea0ff; border: 1px solid rgba(19,55,236,0.25); }
+    .type-fallacy      { background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.25); }
+    .type-mental_model { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
+
+    /* spinner */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner { animation: spin 0.8s linear infinite; }
-    .glow-tl { position:fixed; top:-10%; left:-20%; width:80%; height:40%; border-radius:50%; background:rgba(19,55,236,0.18); filter:blur(100px); pointer-events:none; z-index:0; }
-    .glow-br { position:fixed; bottom:-10%; right:-20%; width:60%; height:40%; border-radius:50%; background:rgba(19,55,236,0.08); filter:blur(80px); pointer-events:none; z-index:0; }
-    /* Modal */
-    #hfModal { display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:1.5rem; }
-    #hfModal.open { display:flex; }
-    .step-num { width:1.5rem; height:1.5rem; border-radius:50%; background:#1337ec; color:#fff; font-size:0.7rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+    /* glow blobs */
+    .glow-tl { position:fixed; top:-10%; left:-20%; width:80%; height:40%; border-radius:50%; background:rgba(19,55,236,0.15); filter:blur(110px); pointer-events:none; z-index:0; }
+    .glow-br { position:fixed; bottom:-10%; right:-20%; width:60%; height:40%; border-radius:50%; background:rgba(19,55,236,0.07); filter:blur(90px); pointer-events:none; z-index:0; }
+
+    /* welcome overlay */
+    #welcomeOverlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(8,10,22,0.92);
+      backdrop-filter: blur(8px);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding: 1.5rem;
+    }
+    #welcomeOverlay.hidden { display: none; }
+
+    /* HF modal */
+    #hfModal {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(6px);
+      align-items: center; justify-content: center; padding: 1.5rem;
+    }
+    #hfModal.open { display: flex; }
+
+    /* concept detail modal */
+    #detailModal {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      align-items: flex-end; justify-content: center;
+    }
+    #detailModal.open { display: flex; }
+
+    /* step numbers */
+    .step-num {
+      width: 1.5rem; height: 1.5rem; border-radius: 50%;
+      background: #1337ec; color: #fff;
+      font-size: 0.65rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    /* feature tiles */
+    .feature-tile {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.5rem; padding: 0.875rem 0.5rem;
+      border-radius: 0.875rem;
+      background: rgba(23,27,47,0.5);
+      border: 1px solid rgba(255,255,255,0.07);
+      text-align: center;
+    }
+
+    /* scan tip chips */
+    .tip-chip {
+      flex-shrink: 0;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      background: rgba(19,55,236,0.1);
+      border: 1px solid rgba(19,55,236,0.25);
+      color: #6ea0ff;
+      font-size: 0.7rem; font-weight: 500;
+      white-space: nowrap; cursor: default;
+    }
+
+    /* AI status bar */
+    .ai-status-bar {
+      display: flex; align-items: center; gap: 0.625rem;
+      padding: 0.625rem 0.875rem;
+      border-radius: 0.75rem;
+      font-size: 0.72rem; font-weight: 500;
+    }
+    .ai-status-bar .dot {
+      width: 0.5rem; height: 0.5rem;
+      border-radius: 50%; flex-shrink: 0;
+    }
+
+    /* scrollable scan results */
+    #scanResultsInner { max-height: 55vh; overflow-y: auto; }
   </style>
 </head>
 
 <body class="min-h-screen overflow-hidden">
-  <div class="glow-tl"></div>
-  <div class="glow-br"></div>
+<div class="glow-tl"></div>
+<div class="glow-br"></div>
 
-  <!-- ── HF CONNECT MODAL ────────────────────────────────────────────────── -->
-  <div id="hfModal" role="dialog" aria-modal="true" aria-labelledby="hfModalTitle">
-    <div class="glass-card rounded-2xl w-full max-w-sm p-6 space-y-5 border border-white/10">
-      <div class="flex items-center justify-between">
-        <h2 id="hfModalTitle" class="text-base font-bold text-white">Connect Hugging Face</h2>
-        <button id="hfModalClose" class="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
-          <span class="material-icons-round text-xl">close</span>
-        </button>
-      </div>
-
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     WELCOME OVERLAY — shown once on first visit
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="welcomeOverlay">
+  <div class="glass-card rounded-2xl w-full max-w-sm p-6 space-y-5 border border-white/10 mb-2">
+    <div class="text-center space-y-1">
+      <div class="text-3xl mb-1">🧠</div>
+      <h1 class="text-lg font-bold text-white">Cognitive Bias Codex</h1>
       <p class="text-xs text-slate-400 leading-relaxed">
-        Your token is <strong class="text-white">stored only in your browser</strong> and sent directly to Hugging Face.
-        It never touches our server and is never logged.
+        A pocket reference for the ways our minds trick us — and a camera that catches them in the wild.
       </p>
+    </div>
 
-      <!-- Step 1 -->
-      <div class="flex gap-3 items-start">
-        <span class="step-num mt-0.5">1</span>
-        <div class="flex-1">
-          <p class="text-xs text-slate-300 font-medium mb-2">Create a free Read token on Hugging Face</p>
-          <a id="hfCreateTokenBtn"
-            href="https://huggingface.co/settings/tokens/new?tokenType=read&description=CognitiveBiasCodex"
-            target="_blank" rel="noopener"
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90"
-            style="background:#ff9d00;">
-            <span class="material-icons-round text-sm">open_in_new</span>
-            Open HF Token Page
-          </a>
-          <p class="text-[10px] text-slate-500 mt-1.5">Free account required &mdash; takes 30 seconds to create</p>
-        </div>
+    <div class="flex gap-2">
+      <div class="feature-tile">
+        <span class="material-icons-round text-primary text-xl">auto_stories</span>
+        <p class="text-[10px] text-slate-300 font-medium">Browse<br>423 concepts</p>
       </div>
-
-      <!-- Step 2 -->
-      <div class="flex gap-3 items-start">
-        <span class="step-num mt-0.5">2</span>
-        <div class="flex-1">
-          <p class="text-xs text-slate-300 font-medium mb-2">Paste your token below</p>
-          <input id="hfTokenInput" type="password"
-            placeholder="hf_xxxxxxxxxxxxxxxxxxxx"
-            autocomplete="off" spellcheck="false"
-            class="block w-full px-3 py-2 rounded-lg bg-white/5 text-white placeholder-slate-600 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary/50 border border-white/10 transition-all" />
-          <div id="hfValidationMsg" class="mt-1.5 text-[10px] hidden"></div>
-        </div>
+      <div class="feature-tile">
+        <span class="material-icons-round text-[#c084fc] text-xl">radar</span>
+        <p class="text-[10px] text-slate-300 font-medium">Scan ads &amp;<br>real scenes</p>
       </div>
+      <div class="feature-tile">
+        <span class="material-icons-round text-[#f59e0b] text-xl">hub</span>
+        <p class="text-[10px] text-slate-300 font-medium">Free AI via<br>Hugging Face</p>
+      </div>
+    </div>
 
-      <!-- Step 3 -->
-      <button id="hfSaveBtn"
-        class="w-full py-2.5 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90"
-        style="background:#1337ec;">
-        <span class="material-icons-round text-base">verified</span>
-        Validate &amp; Save
+    <button id="welcomeStart"
+      class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
+      style="background: linear-gradient(135deg,#1337ec,#5b21b6);">
+      Start Exploring
+    </button>
+    <p class="text-[10px] text-center text-slate-600">No account needed — works instantly</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     HF CONNECT MODAL
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="hfModal" role="dialog" aria-modal="true" aria-labelledby="hfModalTitle">
+  <div class="glass-card rounded-2xl w-full max-w-sm p-6 space-y-5 border border-white/10">
+
+    <div class="flex items-center justify-between">
+      <h2 id="hfModalTitle" class="text-base font-bold text-white">Connect Hugging Face</h2>
+      <button id="hfModalClose" class="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white">
+        <span class="material-icons-round text-xl">close</span>
       </button>
+    </div>
 
-      <div id="hfAlreadyConnected" class="hidden glass-card rounded-xl p-3 border border-emerald-500/30">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="material-icons-round text-emerald-400 text-base">check_circle</span>
-            <div>
-              <p class="text-xs font-semibold text-emerald-400">Connected</p>
-              <p id="hfConnectedUser" class="text-[10px] text-slate-400"></p>
-            </div>
+    <div id="hfAlreadyConnected" class="hidden glass-card rounded-xl p-3 border border-emerald-500/30">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="material-icons-round text-emerald-400 text-base">check_circle</span>
+          <div>
+            <p class="text-xs font-semibold text-emerald-400">Connected</p>
+            <p id="hfConnectedUser" class="text-[10px] text-slate-400"></p>
           </div>
-          <button id="hfDisconnectBtn" class="text-[10px] text-rose-400 hover:underline">Disconnect</button>
+        </div>
+        <button id="hfDisconnectBtn" class="text-[10px] text-rose-400 hover:underline">Disconnect</button>
+      </div>
+    </div>
+
+    <p class="text-xs text-slate-400 leading-relaxed">
+      Your token lives <strong class="text-white">only in your browser</strong>.
+      It goes directly to Hugging Face — never stored on our server.
+    </p>
+
+    <!-- Step 1 -->
+    <div class="flex gap-3 items-start">
+      <span class="step-num mt-0.5">1</span>
+      <div class="flex-1">
+        <p class="text-xs text-slate-300 font-medium mb-2">Get a free token from Hugging Face</p>
+        <a href="https://huggingface.co/settings/tokens/new?tokenType=read&description=CognitiveBiasCodex"
+          target="_blank" rel="noopener"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition-all"
+          style="background:#ff9d00;">
+          <span class="material-icons-round text-sm">open_in_new</span>
+          Open Hugging Face →
+        </a>
+        <p class="text-[10px] text-slate-500 mt-1.5">Free account · takes 30 seconds</p>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="flex gap-3 items-start">
+      <span class="step-num mt-0.5">2</span>
+      <div class="flex-1">
+        <p class="text-xs text-slate-300 font-medium mb-2">Paste your token here</p>
+        <input id="hfTokenInput" type="password"
+          placeholder="hf_xxxxxxxxxxxxxxxxxxxx"
+          autocomplete="off" spellcheck="false"
+          class="block w-full px-3 py-2 rounded-lg bg-white/5 text-white placeholder-slate-600 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary/50 border border-white/10" />
+        <div id="hfValidationMsg" class="mt-1.5 text-[10px] hidden"></div>
+      </div>
+    </div>
+
+    <button id="hfSaveBtn"
+      class="w-full py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all"
+      style="background:#1337ec;">
+      <span class="material-icons-round text-base">verified</span>
+      Validate &amp; Save
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CONCEPT DETAIL MODAL
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="detailModal" role="dialog" aria-modal="true">
+  <div id="detailSheet"
+    class="glass-card rounded-t-2xl w-full max-w-md p-6 space-y-4 border-t border-white/10"
+    style="max-height:80vh; overflow-y:auto;">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex-1">
+        <div id="detailPills" class="flex items-center gap-1.5 flex-wrap mb-2"></div>
+        <h2 id="detailName" class="text-lg font-bold text-white leading-tight"></h2>
+      </div>
+      <button id="detailClose" class="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white flex-shrink-0 mt-1">
+        <span class="material-icons-round text-xl">close</span>
+      </button>
+    </div>
+    <p id="detailDesc" class="text-sm text-slate-300 leading-relaxed"></p>
+    <div id="detailWiki" class="hidden glass-card rounded-xl p-3 border border-white/5">
+      <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">From Wikipedia</p>
+      <p id="detailWikiText" class="text-xs text-slate-400 leading-relaxed"></p>
+    </div>
+    <div id="detailLinkWrap" class="hidden">
+      <a id="detailLink" href="#" target="_blank" rel="noopener"
+        class="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline">
+        <span class="material-icons-round text-sm">open_in_new</span>
+        Learn more
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MAIN APP
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="max-w-md mx-auto min-h-screen flex flex-col relative z-10 pb-20">
+
+  <!-- ── LIBRARY TAB ───────────────────────────────────────────────────────── -->
+  <div id="tab-library" class="tab-panel active">
+    <header class="sticky top-0 z-50 glass px-5 pt-12 pb-4 rounded-b-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">Cognitive Bias Codex</p>
+          <h1 class="text-xl font-bold text-white">Library</h1>
+        </div>
+        <div class="text-right">
+          <p class="text-base font-bold text-white"><span id="totalCount">—</span></p>
+          <p class="text-[10px] text-slate-500">concepts</p>
         </div>
       </div>
+      <div class="relative mb-3">
+        <span class="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">search</span>
+        <input id="searchInput"
+          class="block w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/5 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 border border-white/8 transition-all"
+          placeholder="Search 423 biases, fallacies, models…" type="text" />
+      </div>
+      <div class="flex gap-2 overflow-x-auto no-scroll">
+        <button data-filter="" class="filter-btn flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-primary text-white border border-primary">All</button>
+        <button data-filter="bias" class="filter-btn flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10">Biases</button>
+        <button data-filter="fallacy" class="filter-btn flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10">Fallacies</button>
+        <button data-filter="mental_model" class="filter-btn flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10">Mental Models</button>
+      </div>
+    </header>
+
+    <!-- Daily pick -->
+    <div id="dailyPick" class="hidden mx-4 mt-4">
+      <div class="glass-card rounded-xl p-4 border border-primary/20 cursor-pointer hover:border-primary/40 transition-colors" id="dailyPickCard">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="material-icons-round text-primary text-sm">auto_awesome</span>
+          <p class="text-[10px] font-bold tracking-wider uppercase text-primary">Concept of the day</p>
+        </div>
+        <h3 id="dailyPickName" class="text-sm font-bold text-white mb-1"></h3>
+        <p id="dailyPickDesc" class="text-[11px] text-slate-400 leading-relaxed"></p>
+      </div>
+    </div>
+
+    <main class="flex-1 overflow-y-auto px-4 pt-3 pb-3 space-y-2.5" id="conceptList">
+      <div class="flex items-center justify-center py-16">
+        <div class="w-6 h-6 rounded-full border-2 border-primary border-t-transparent spinner"></div>
+      </div>
+    </main>
+    <div class="px-4 pb-4 pt-1">
+      <button id="loadMoreBtn" class="hidden w-full py-2.5 rounded-xl text-sm font-semibold text-primary border border-primary/30 hover:bg-primary/10 transition-all">
+        Load more
+      </button>
     </div>
   </div>
 
-  <div class="max-w-md mx-auto min-h-screen flex flex-col relative z-10 pb-20">
-
-    <!-- ── LIBRARY TAB ──────────────────────────────────────────────────── -->
-    <div id="tab-library" class="tab-panel active">
-      <header class="sticky top-0 z-50 glass px-5 pt-12 pb-4 rounded-b-xl">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">Cognitive Bias Codex</p>
-            <h1 class="text-xl font-bold text-white">Library</h1>
-          </div>
-          <div class="text-right text-xs text-slate-400 font-mono">
-            <span id="totalCount">—</span> concepts
-          </div>
+  <!-- ── SCAN TAB ──────────────────────────────────────────────────────────── -->
+  <div id="tab-scan" class="tab-panel">
+    <header class="glass px-5 pt-12 pb-4 rounded-b-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">AR Scanner</p>
+          <h1 class="text-xl font-bold text-white">Scan a Scene</h1>
         </div>
-        <div class="relative mb-3">
-          <span class="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-primary text-sm">search</span>
-          <input id="searchInput"
-            class="block w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/5 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
-            placeholder="Search biases, fallacies, models…" type="text" />
-        </div>
-        <div class="flex gap-2 overflow-x-auto no-scroll">
-          <button data-filter="" class="filter-btn flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-medium bg-primary text-white border border-primary">All</button>
-          <button data-filter="bias" class="filter-btn flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-medium bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10">Biases</button>
-          <button data-filter="fallacy" class="filter-btn flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-medium bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10">Fallacies</button>
-          <button data-filter="mental_model" class="filter-btn flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-medium bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10">Mental Models</button>
-        </div>
-      </header>
-      <main class="flex-1 overflow-y-auto px-4 pt-4 space-y-3" id="conceptList">
-        <div class="flex items-center justify-center py-12">
-          <div class="w-6 h-6 rounded-full border-2 border-primary border-t-transparent spinner"></div>
-        </div>
-      </main>
-      <div class="px-4 pb-4 pt-2">
-        <button id="loadMoreBtn" class="hidden w-full py-2.5 rounded-lg text-sm font-medium text-primary border border-primary/30 hover:bg-primary/10 transition-all">Load more</button>
+        <button id="hfConnectBadge" onclick="openHFModal()"
+          title="Connect Hugging Face for free AI analysis"
+          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-all hover:opacity-80 active:scale-95">
+          <span class="material-icons-round text-xs">hub</span>
+          <span id="hfBadgeLabel">HF: off</span>
+        </button>
       </div>
-    </div>
 
-    <!-- ── SCAN TAB ──────────────────────────────────────────────────────── -->
-    <div id="tab-scan" class="tab-panel">
-      <header class="glass px-5 pt-12 pb-4 rounded-b-xl">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">AR Scanner</p>
-            <h1 class="text-xl font-bold text-white">Scan Scene</h1>
-          </div>
-          <div class="flex items-center gap-2">
-            <div id="backendBadge" class="text-[10px] font-mono px-2 py-1 rounded bg-white/5 text-slate-400 border border-white/10">detecting…</div>
-            <!-- HF Connect button -->
-            <button id="hfConnectBadge" onclick="openHFModal()"
-              title="Connect your Hugging Face account for cloud AI analysis"
-              class="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono border transition-all hover:opacity-80"
-              style="background:rgba(255,157,0,0.1); border-color:rgba(255,157,0,0.3); color:#ff9d00;">
-              <span class="material-icons-round text-xs">hub</span>
-              <span id="hfBadgeLabel">HF: off</span>
+      <!-- AI status bar -->
+      <div id="aiStatusBar" class="ai-status-bar bg-white/5 border border-white/8 text-slate-400">
+        <div class="dot bg-slate-600"></div>
+        <span id="aiStatusText">Checking AI…</span>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-3">
+
+      <!-- Inline HF prompt — shown when no AI is available -->
+      <div id="hfInlinePrompt" class="hidden glass-card rounded-xl p-4 border border-amber-500/25">
+        <div class="flex items-start gap-3">
+          <span class="material-icons-round text-amber-400 text-xl flex-shrink-0 mt-0.5">hub</span>
+          <div class="flex-1">
+            <p class="text-sm font-bold text-white mb-0.5">Activate AI analysis — free</p>
+            <p class="text-xs text-slate-400 leading-relaxed mb-3">
+              Connect your Hugging Face account in one tap. Your token stays in your browser, never on our server.
+            </p>
+            <button onclick="openHFModal()"
+              class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white hover:opacity-90 active:scale-95 transition-all"
+              style="background:#ff9d00;">
+              <span class="material-icons-round text-sm">hub</span>
+              Connect Hugging Face — Free
             </button>
           </div>
         </div>
-      </header>
-      <main class="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4">
-        <div class="relative rounded-xl overflow-hidden bg-white/5 border border-white/10" style="height:260px;">
-          <video id="videoEl" autoplay playsinline muted></video>
-          <canvas id="canvasEl"></canvas>
-          <div id="camPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
-            <span class="material-icons-round text-4xl mb-2">videocam_off</span>
-            <span class="text-xs">Camera off</span>
-          </div>
-          <div id="scanOverlay" class="hidden absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
-            <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent spinner mb-2"></div>
-              <span class="text-xs text-primary font-medium">Analyzing…</span>
-            </div>
-          </div>
-        </div>
-        <div class="flex gap-3">
-          <button id="startCamBtn" class="flex-1 py-2.5 rounded-lg text-sm font-medium bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 flex items-center justify-center gap-2 transition-all">
-            <span class="material-icons-round text-base">videocam</span>Start Camera
-          </button>
-          <button id="scanBtn" disabled class="flex-1 py-2.5 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2 transition-all" style="background:#1337ec;opacity:0.4;">
-            <span class="material-icons-round text-base">radar</span>Scan
-          </button>
-        </div>
-        <div id="scanResults" class="space-y-3 hidden">
-          <div id="sceneDesc" class="glass-card rounded-xl p-3 text-xs text-slate-300 leading-relaxed italic"></div>
-          <div id="resultsList" class="space-y-2"></div>
-          <div id="backendNote" class="text-[10px] text-slate-600 text-center mt-1"></div>
-        </div>
-        <div id="scanError" class="hidden glass-card rounded-xl p-4 text-sm text-rose-400 border border-rose-500/20"></div>
-      </main>
-    </div>
+      </div>
 
-    <!-- ── SETTINGS TAB ──────────────────────────────────────────────────── -->
-    <div id="tab-settings" class="tab-panel">
-      <header class="glass px-5 pt-12 pb-4 rounded-b-xl">
-        <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">Configuration</p>
-        <h1 class="text-xl font-bold text-white">Settings</h1>
-      </header>
-      <main class="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4">
+      <!-- Camera -->
+      <div class="relative rounded-xl overflow-hidden bg-white/5 border border-white/10" style="height:252px;">
+        <video id="videoEl" autoplay playsinline muted></video>
+        <canvas id="canvasEl"></canvas>
+        <div id="camPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-600">
+          <span class="material-icons-round text-4xl">videocam_off</span>
+          <p class="text-xs text-center px-6 leading-relaxed">Point your camera at an ad, social media post, menu, or news headline</p>
+        </div>
+        <div id="scanOverlay" class="hidden absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
+          <div class="flex flex-col items-center gap-2">
+            <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent spinner"></div>
+            <span class="text-xs text-primary font-semibold">Analyzing…</span>
+          </div>
+        </div>
+      </div>
 
-        <!-- HF Connection card -->
+      <!-- Scan tips -->
+      <div class="flex gap-2 overflow-x-auto no-scroll">
+        <div class="tip-chip">📢 Ads</div>
+        <div class="tip-chip">📱 Social posts</div>
+        <div class="tip-chip">🛒 Product packaging</div>
+        <div class="tip-chip">📰 Headlines</div>
+        <div class="tip-chip">🍽️ Menus</div>
+        <div class="tip-chip">🏪 Storefronts</div>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex gap-3">
+        <button id="startCamBtn"
+          class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 flex items-center justify-center gap-2 transition-all active:scale-95">
+          <span class="material-icons-round text-base">videocam</span>
+          Start Camera
+        </button>
+        <button id="scanBtn" disabled
+          class="flex-1 py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
+          style="background:#1337ec; opacity:0.35;">
+          <span class="material-icons-round text-base">radar</span>
+          Scan
+        </button>
+      </div>
+
+      <!-- Results -->
+      <div id="scanResults" class="hidden space-y-2.5">
+        <div id="sceneDesc" class="glass-card rounded-xl p-3 text-xs text-slate-300 leading-relaxed italic border border-white/5"></div>
+        <div id="scanResultsInner" class="space-y-2 overflow-y-auto" style="max-height:42vh;"></div>
+        <p id="backendNote" class="text-[10px] text-slate-600 text-center"></p>
+      </div>
+
+      <div id="scanError" class="hidden glass-card rounded-xl p-4 border border-rose-500/20">
+        <div class="flex items-start gap-2">
+          <span class="material-icons-round text-rose-400 text-base flex-shrink-0 mt-0.5">error_outline</span>
+          <p id="scanErrorText" class="text-sm text-rose-400 leading-relaxed"></p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ── SETTINGS TAB ──────────────────────────────────────────────────────── -->
+  <div id="tab-settings" class="tab-panel">
+    <header class="glass px-5 pt-12 pb-5 rounded-b-2xl">
+      <p class="text-[10px] font-bold tracking-widest uppercase text-primary mb-0.5">Configuration</p>
+      <h1 class="text-xl font-bold text-white">Settings</h1>
+    </header>
+
+    <main class="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4">
+
+      <!-- AI Analysis section -->
+      <div class="space-y-2">
+        <p class="text-[10px] font-bold tracking-widest uppercase text-slate-500 px-1">AI Analysis</p>
+
+        <!-- HF card -->
         <div class="glass-card rounded-xl p-4 space-y-3">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="material-icons-round text-[#ff9d00]">hub</span>
-            <h2 class="text-sm font-bold text-white">Hugging Face AI</h2>
+          <div class="flex items-center gap-2">
+            <span class="material-icons-round text-[#ff9d00] text-lg">hub</span>
+            <div class="flex-1">
+              <p class="text-sm font-bold text-white">Hugging Face</p>
+              <p class="text-[10px] text-slate-500">Free · Cloud · Your own account</p>
+            </div>
+            <div id="settingsHFChip" class="px-2 py-0.5 rounded-full text-[10px] font-semibold border">
+            </div>
           </div>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Connect your free Hugging Face account to enable cloud AI analysis.
-            Your token is saved <strong class="text-white">only in your browser</strong> — it never leaves your device except to call HF directly.
+            Get cloud AI analysis at no cost. Your token is saved in your browser only — never sent to our server.
           </p>
-          <div id="settingsHFStatus" class="glass-card rounded-lg p-3 border border-white/5">
-            <div id="settingsHFConnected" class="hidden flex items-center gap-2">
-              <span class="material-icons-round text-emerald-400 text-base">check_circle</span>
-              <div class="flex-1">
-                <p class="text-xs font-semibold text-emerald-400">Connected</p>
-                <p id="settingsHFUser" class="text-[10px] text-slate-400"></p>
-              </div>
-              <button id="settingsHFDisconnect" class="text-[10px] text-rose-400 hover:underline">Remove</button>
+          <div id="settingsHFConnectedRow" class="hidden flex items-center justify-between glass-card rounded-lg px-3 py-2 border border-emerald-500/20">
+            <div class="flex items-center gap-2">
+              <span class="material-icons-round text-emerald-400 text-sm">check_circle</span>
+              <p id="settingsHFUser" class="text-xs text-emerald-400 font-medium"></p>
             </div>
-            <div id="settingsHFDisconnectedState" class="flex items-center gap-2">
-              <span class="material-icons-round text-slate-500 text-base">link_off</span>
-              <p class="text-xs text-slate-500">Not connected</p>
-            </div>
+            <button id="settingsHFDisconnect" class="text-[10px] text-rose-400 hover:underline">Remove</button>
           </div>
-          <button onclick="openHFModal()" class="w-full py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90" style="background:rgba(255,157,0,0.15); color:#ff9d00; border:1px solid rgba(255,157,0,0.3);">
+          <button onclick="openHFModal()"
+            class="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95"
+            style="background:rgba(255,157,0,0.12); color:#ff9d00; border:1px solid rgba(255,157,0,0.3);">
             <span class="material-icons-round text-base">hub</span>
-            Connect Hugging Face — Free
+            <span id="settingsHFBtnLabel">Connect Hugging Face — Free</span>
           </button>
         </div>
 
         <!-- Anthropic card -->
         <div class="glass-card rounded-xl p-4 space-y-3">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="material-icons-round text-primary">visibility</span>
-            <h2 class="text-sm font-bold text-white">Anthropic Vision AI</h2>
-            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono border border-white/10 text-slate-500 bg-white/5">server-side</span>
+          <div class="flex items-center gap-2">
+            <span class="material-icons-round text-primary text-lg">visibility</span>
+            <div class="flex-1">
+              <p class="text-sm font-bold text-white">Vision AI</p>
+              <p class="text-[10px] text-slate-500">Paid · Best quality · Server-configured</p>
+            </div>
+            <div id="anthropicChip" class="px-2 py-0.5 rounded-full text-[10px] font-semibold border border-white/10 text-slate-600 bg-white/5">
+              checking…
+            </div>
           </div>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Full image vision analysis. Set <code class="text-primary bg-white/5 px-1 rounded">ANTHROPIC_API_KEY</code> as an environment variable on the server or in your Space secrets.
+            Full image understanding — the scanner actually sees what you're pointing at.
+            Set up by whoever runs this instance; no action needed from you.
           </p>
-          <div id="anthropicStatus" class="glass-card rounded-lg p-3 border border-white/5 text-xs text-slate-500 font-mono">checking…</div>
         </div>
+      </div>
 
-        <!-- About card -->
-        <div class="glass-card rounded-xl p-4 space-y-2">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="material-icons-round text-slate-400">info</span>
-            <h2 class="text-sm font-bold text-white">About</h2>
-          </div>
+      <!-- About section -->
+      <div class="space-y-2">
+        <p class="text-[10px] font-bold tracking-widest uppercase text-slate-500 px-1">About</p>
+        <div class="glass-card rounded-xl p-4 space-y-3">
           <p class="text-xs text-slate-400 leading-relaxed">
-            Cognitive Bias Codex &mdash; a searchable library of 423 biases, fallacies, and mental models with an AR camera scanner.
+            Cognitive Bias Codex — a searchable library of 423 biases, logical fallacies, and mental models with an AR camera scanner powered by AI.
           </p>
-          <a href="/docs" target="_blank" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-            <span class="material-icons-round text-sm">api</span>API Docs (Swagger)
-          </a>
+          <div class="flex flex-col gap-2">
+            <a href="/docs" target="_blank"
+              class="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium">
+              <span class="material-icons-round text-sm">api</span>
+              API Documentation
+            </a>
+            <a href="https://github.com/hermz580/Cognitivebaiscodex2" target="_blank" rel="noopener"
+              class="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white hover:underline font-medium">
+              <span class="material-icons-round text-sm">code</span>
+              View on GitHub
+            </a>
+          </div>
         </div>
+      </div>
 
-      </main>
-    </div>
-
+    </main>
   </div>
 
-  <!-- ── BOTTOM NAV ─────────────────────────────────────────────────────── -->
-  <nav class="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 z-50 glass border-t border-white/5 pb-6 pt-3 px-8">
-    <ul class="flex justify-around items-center">
-      <li>
-        <button onclick="switchTab('library')" id="nav-library" class="nav-btn flex flex-col items-center">
-          <span class="material-icons-round text-primary text-2xl">auto_stories</span>
-          <span class="text-[10px] font-medium text-white mt-0.5">Library</span>
-        </button>
-      </li>
-      <li>
-        <button onclick="switchTab('scan')" id="nav-scan" class="nav-btn flex flex-col items-center">
-          <span class="material-icons-round text-slate-500 text-2xl">radar</span>
-          <span class="text-[10px] font-medium text-slate-500 mt-0.5">Scan</span>
-        </button>
-      </li>
-      <li>
-        <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col items-center">
-          <span class="material-icons-round text-slate-500 text-2xl">settings</span>
-          <span class="text-[10px] font-medium text-slate-500 mt-0.5">Settings</span>
-        </button>
-      </li>
-    </ul>
-  </nav>
+</div><!-- /max-w-md -->
 
-  <script>
-  // ── HF token storage ───────────────────────────────────────────────────────
-  const HF_KEY = "cbc_hf_token";
-  const HF_USER_KEY = "cbc_hf_user";
+<!-- ── BOTTOM NAV ──────────────────────────────────────────────────────────── -->
+<nav class="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 z-50 glass border-t border-white/5 pb-6 pt-2 px-8">
+  <ul class="flex justify-around items-center">
+    <li>
+      <button onclick="switchTab('library')" id="nav-library" class="flex flex-col items-center gap-0.5 px-4 py-1">
+        <span class="material-icons-round text-primary text-2xl">auto_stories</span>
+        <span class="text-[10px] font-semibold text-white">Library</span>
+      </button>
+    </li>
+    <li>
+      <button onclick="switchTab('scan')" id="nav-scan" class="flex flex-col items-center gap-0.5 px-4 py-1">
+        <span class="material-icons-round text-slate-500 text-2xl">radar</span>
+        <span class="text-[10px] font-semibold text-slate-500">Scan</span>
+      </button>
+    </li>
+    <li>
+      <button onclick="switchTab('settings')" id="nav-settings" class="flex flex-col items-center gap-0.5 px-4 py-1">
+        <span class="material-icons-round text-slate-500 text-2xl">tune</span>
+        <span class="text-[10px] font-semibold text-slate-500">Settings</span>
+      </button>
+    </li>
+  </ul>
+</nav>
 
-  function getHFToken() { return localStorage.getItem(HF_KEY) || ""; }
-  function getHFUser()  { return localStorage.getItem(HF_USER_KEY) || ""; }
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     SCRIPTS
+═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+// ─── Constants ────────────────────────────────────────────────────────────────
+const HF_KEY      = "cbc_hf_token";
+const HF_USER_KEY = "cbc_hf_user";
+const WELCOME_KEY = "cbc_welcomed_v1";
+const DAILY_KEY   = "cbc_daily_pick";
 
-  function saveHFToken(token, username) {
-    localStorage.setItem(HF_KEY, token);
-    localStorage.setItem(HF_USER_KEY, username);
-    updateHFUI();
-  }
+// ─── HF token helpers ─────────────────────────────────────────────────────────
+const getHFToken = () => localStorage.getItem(HF_KEY) || "";
+const getHFUser  = () => localStorage.getItem(HF_USER_KEY) || "";
 
-  function removeHFToken() {
-    localStorage.removeItem(HF_KEY);
-    localStorage.removeItem(HF_USER_KEY);
-    updateHFUI();
-  }
-
-  function updateHFUI() {
-    const token = getHFToken();
-    const user  = getHFUser();
-    const connected = !!token;
-
-    // Scan tab badge
-    const badge = document.getElementById("hfConnectBadge");
-    const label = document.getElementById("hfBadgeLabel");
-    if (connected) {
-      badge.style.background = "rgba(16,185,129,0.15)";
-      badge.style.borderColor = "rgba(16,185,129,0.4)";
-      badge.style.color = "#10b981";
-      label.textContent = "HF: on";
-    } else {
-      badge.style.background = "rgba(255,157,0,0.1)";
-      badge.style.borderColor = "rgba(255,157,0,0.3)";
-      badge.style.color = "#ff9d00";
-      label.textContent = "HF: off";
-    }
-
-    // Modal state
-    const alreadyCard = document.getElementById("hfAlreadyConnected");
-    const connUser    = document.getElementById("hfConnectedUser");
-    if (connected) {
-      alreadyCard.classList.remove("hidden");
-      connUser.textContent = "@" + user;
-    } else {
-      alreadyCard.classList.add("hidden");
-    }
-
-    // Settings tab
-    const sConn  = document.getElementById("settingsHFConnected");
-    const sDisc  = document.getElementById("settingsHFDisconnectedState");
-    const sUser  = document.getElementById("settingsHFUser");
-    if (connected) {
-      sConn.classList.remove("hidden");
-      sDisc.classList.add("hidden");
-      sUser.textContent = "@" + user;
-    } else {
-      sConn.classList.add("hidden");
-      sDisc.classList.remove("hidden");
-    }
-  }
-
-  // ── Modal ──────────────────────────────────────────────────────────────────
-  function openHFModal() {
-    document.getElementById("hfModal").classList.add("open");
-    document.getElementById("hfTokenInput").value = "";
-    const msg = document.getElementById("hfValidationMsg");
-    msg.classList.add("hidden");
-    msg.textContent = "";
-  }
-
-  function closeHFModal() {
-    document.getElementById("hfModal").classList.remove("open");
-  }
-
-  document.getElementById("hfModalClose").addEventListener("click", closeHFModal);
-  document.getElementById("hfModal").addEventListener("click", e => {
-    if (e.target === document.getElementById("hfModal")) closeHFModal();
-  });
-
-  document.getElementById("hfDisconnectBtn").addEventListener("click", () => {
-    removeHFToken(); closeHFModal();
-  });
-  document.getElementById("settingsHFDisconnect")?.addEventListener("click", () => removeHFToken());
-
-  document.getElementById("hfSaveBtn").addEventListener("click", async () => {
-    const input = document.getElementById("hfTokenInput");
-    const msg   = document.getElementById("hfValidationMsg");
-    const btn   = document.getElementById("hfSaveBtn");
-    const token = input.value.trim();
-
-    if (!token) {
-      msg.textContent = "Please paste your token first.";
-      msg.className   = "mt-1.5 text-[10px] text-amber-400";
-      msg.classList.remove("hidden");
-      return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-white border-t-transparent spinner"></div> Validating…`;
-    msg.classList.add("hidden");
-
-    try {
-      const res  = await fetch("/auth/validate-hf-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-      const data = await res.json();
-
-      if (res.ok && data.valid) {
-        saveHFToken(token, data.username);
-        msg.textContent = `✓ Connected as @${data.username}`;
-        msg.className   = "mt-1.5 text-[10px] text-emerald-400";
-        msg.classList.remove("hidden");
-        input.value = "";
-        setTimeout(closeHFModal, 1200);
-      } else {
-        msg.textContent = data.detail || "Token invalid. Try again.";
-        msg.className   = "mt-1.5 text-[10px] text-rose-400";
-        msg.classList.remove("hidden");
-      }
-    } catch (_) {
-      msg.textContent = "Could not reach server. Try again.";
-      msg.className   = "mt-1.5 text-[10px] text-rose-400";
-      msg.classList.remove("hidden");
-    }
-
-    btn.disabled = false;
-    btn.innerHTML = `<span class="material-icons-round text-base">verified</span> Validate &amp; Save`;
-  });
-
-  // ── state ──────────────────────────────────────────────────────────────────
-  const S = { page:1, size:20, term:"", type:"", loading:false, hasMore:true, stream:null };
-
-  // ── tab switching ──────────────────────────────────────────────────────────
-  function switchTab(name) {
-    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-    document.getElementById("tab-" + name).classList.add("active");
-
-    const tabs = { library: "nav-library", scan: "nav-scan", settings: "nav-settings" };
-    const icons = { library: "auto_stories", scan: "radar", settings: "settings" };
-    Object.entries(tabs).forEach(([t, id]) => {
-      const btn  = document.getElementById(id);
-      const icon = btn.querySelector(".material-icons-round");
-      const lbl  = btn.querySelector("span:last-child");
-      const active = t === name;
-      icon.className = "material-icons-round text-2xl " + (active ? "text-primary" : "text-slate-500");
-      lbl.className  = "text-[10px] font-medium mt-0.5 " + (active ? "text-white" : "text-slate-500");
-    });
-  }
-
-  // ── filter buttons ─────────────────────────────────────────────────────────
-  document.querySelectorAll(".filter-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".filter-btn").forEach(b => {
-        b.className = b.className
-          .replace("bg-primary text-white border-primary", "")
-          + " bg-white/5 text-slate-300 border-white/10";
-      });
-      btn.className = btn.className
-        .replace("bg-white/5 text-slate-300 border-white/10", "")
-        + " bg-primary text-white border-primary";
-      S.type = btn.dataset.filter;
-      resetAndLoad();
-    });
-  });
-
-  // ── search ─────────────────────────────────────────────────────────────────
-  let searchTimer;
-  document.getElementById("searchInput").addEventListener("input", e => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { S.term = e.target.value.trim(); resetAndLoad(); }, 320);
-  });
-
-  // ── concept list ───────────────────────────────────────────────────────────
-  function resetAndLoad() {
-    S.page = 1; S.hasMore = true;
-    document.getElementById("conceptList").innerHTML =
-      `<div class="flex items-center justify-center py-12"><div class="w-6 h-6 rounded-full border-2 border-primary border-t-transparent spinner"></div></div>`;
-    loadPage(true);
-  }
-
-  async function loadPage(replace = false) {
-    if (S.loading || (!S.hasMore && !replace)) return;
-    S.loading = true;
-    document.getElementById("loadMoreBtn").classList.add("hidden");
-
-    const p = new URLSearchParams({ page: S.page, size: S.size });
-    if (S.term) p.set("term", S.term);
-    if (S.type) p.set("type", S.type);
-
-    try {
-      const res  = await fetch(`/search?${p}`);
-      const data = await res.json();
-      if (replace) document.getElementById("conceptList").innerHTML = "";
-      if (data.items.length === 0 && replace) {
-        document.getElementById("conceptList").innerHTML =
-          `<p class="text-center text-sm text-slate-500 py-12">No results found.</p>`;
-      }
-      data.items.forEach(c => document.getElementById("conceptList").appendChild(conceptCard(c)));
-      S.page++;
-      S.hasMore = S.page <= data.total_pages;
-      document.getElementById("loadMoreBtn").classList.toggle("hidden", !S.hasMore);
-    } catch (_) {
-      if (replace)
-        document.getElementById("conceptList").innerHTML =
-          `<p class="text-center text-sm text-rose-400 py-12">Failed to load. Is the server running?</p>`;
-    } finally {
-      S.loading = false;
-    }
-  }
-
-  document.getElementById("loadMoreBtn").addEventListener("click", () => loadPage());
-
-  function conceptCard(c) {
-    const typePill = `type-${c.type}`;
-    const typeLabel = c.type.replace("_", " ").toUpperCase();
-    const desc = c.description
-      ? c.description.replace(/</g,"&lt;").replace(/>/g,"&gt;").slice(0,130) + (c.description.length > 130 ? "…" : "")
-      : "No description available.";
-    const el = document.createElement("article");
-    el.className = "glass-card rounded-xl p-4 relative overflow-hidden group hover:border-primary/40 transition-colors";
-    el.innerHTML = `
-      <div class="flex items-start justify-between mb-1.5">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="px-1.5 py-0.5 rounded text-[10px] font-mono border ${typePill}">${typeLabel}</span>
-          ${c.category ? `<span class="text-[10px] text-slate-500 font-mono truncate max-w-[140px]">${c.category}</span>` : ""}
-        </div>
-        ${c.url ? `<a href="${c.url}" target="_blank" rel="noopener" class="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-primary transition-colors" onclick="event.stopPropagation()"><span class="material-icons-round text-sm">open_in_new</span></a>` : ""}
-      </div>
-      <h3 class="text-base font-bold text-white group-hover:text-primary transition-colors mb-1.5">${c.name}</h3>
-      <p class="text-xs text-slate-400 leading-relaxed">${desc}</p>`;
-    return el;
-  }
-
-  // ── stats ──────────────────────────────────────────────────────────────────
-  async function loadStats() {
-    try {
-      const data = await (await fetch("/stats")).json();
-      document.getElementById("totalCount").textContent = data.total_concepts.toLocaleString();
-      const badge = document.getElementById("backendBadge");
-      const anthr = document.getElementById("anthropicStatus");
-      if (data.ai_backend.includes("anthropic")) {
-        badge.textContent = "vision AI ready";
-        badge.style.color = "#10b981";
-        if (anthr) { anthr.textContent = "✓ Configured (server-side)"; anthr.style.color = "#10b981"; }
-      } else {
-        badge.textContent = getHFToken() ? "HF connected" : "no vision AI";
-        badge.style.color = getHFToken() ? "#f59e0b" : "#ef4444";
-        if (anthr) { anthr.textContent = "Not configured — set ANTHROPIC_API_KEY in server environment"; anthr.style.color = "#6b7280"; }
-      }
-    } catch (_) {}
-  }
-
-  // ── camera ─────────────────────────────────────────────────────────────────
-  const video   = document.getElementById("videoEl");
-  const canvas  = document.getElementById("canvasEl");
-  const scanBtn = document.getElementById("scanBtn");
-  const startBtn = document.getElementById("startCamBtn");
-
-  startBtn.addEventListener("click", async () => {
-    if (S.stream) {
-      S.stream.getTracks().forEach(t => t.stop());
-      S.stream = null; video.srcObject = null;
-      document.getElementById("camPlaceholder").classList.remove("hidden");
-      startBtn.innerHTML = `<span class="material-icons-round text-base">videocam</span>Start Camera`;
-      scanBtn.disabled = true; scanBtn.style.opacity = "0.4";
-      return;
-    }
-    try {
-      S.stream = await navigator.mediaDevices.getUserMedia(
-        { video: { facingMode: "environment", width: {ideal:1280}, height: {ideal:720} } }
-      );
-      video.srcObject = S.stream;
-      document.getElementById("camPlaceholder").classList.add("hidden");
-      startBtn.innerHTML = `<span class="material-icons-round text-base">videocam_off</span>Stop`;
-      scanBtn.disabled = false; scanBtn.style.opacity = "1";
-    } catch (_) { showScanError("Camera access denied. Please allow camera permissions."); }
-  });
-
-  scanBtn.addEventListener("click", async () => {
-    if (!S.stream) return;
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    canvas.getContext("2d").drawImage(video, 0, 0);
-    const b64 = canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
-
-    document.getElementById("scanOverlay").classList.remove("hidden");
-    document.getElementById("scanResults").classList.add("hidden");
-    document.getElementById("scanError").classList.add("hidden");
-    scanBtn.disabled = true;
-
-    try {
-      const headers = { "Content-Type": "application/json" };
-      const hfToken = getHFToken();
-      if (hfToken) headers["X-HF-Token"] = hfToken;
-
-      const res  = await fetch("/analyze", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ image: b64, media_type: "image/jpeg" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Analysis failed.");
-      renderResults(data);
-    } catch (e) { showScanError(e.message); }
-    finally {
-      document.getElementById("scanOverlay").classList.add("hidden");
-      scanBtn.disabled = false;
-    }
-  });
-
-  function renderResults(data) {
-    document.getElementById("sceneDesc").textContent = data.scene || "Scene analyzed.";
-    const list = document.getElementById("resultsList");
-    list.innerHTML = "";
-    if (!data.detected || data.detected.length === 0) {
-      list.innerHTML = `<p class="text-center text-sm text-slate-500 py-4">No biases clearly evidenced in this scene.</p>`;
-    } else {
-      data.detected.forEach(d => {
-        const card = document.createElement("div");
-        card.className = "glass-card rounded-xl p-3 space-y-1.5";
-        card.innerHTML = `
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-bold text-white text-sm">${d.name}</span>
-            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono border conf-${d.confidence || "medium"}">${d.confidence || "medium"}</span>
-            ${d.type ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono border type-${d.type}">${d.type.replace("_"," ")}</span>` : ""}
-          </div>
-          <p class="text-xs text-slate-400 leading-relaxed">${d.reason}</p>
-          ${d.category ? `<p class="text-[10px] text-slate-600 font-mono">${d.category}${d.subcategory ? " › " + d.subcategory : ""}</p>` : ""}
-          ${d.url ? `<a href="${d.url}" target="_blank" rel="noopener" class="text-[10px] text-primary hover:underline flex items-center gap-1"><span class="material-icons-round text-xs">open_in_new</span>Learn more</a>` : ""}`;
-        list.appendChild(card);
-      });
-    }
-    const notes = {
-      anthropic:    "✓ Vision analysis via Anthropic Claude",
-      huggingface:  "⚠ Cloud text analysis via Hugging Face (image not processed)",
-      local_llm:    "⚠ Local text analysis (image not processed — home network only)",
-    };
-    document.getElementById("backendNote").textContent = notes[data.backend_used] || "";
-    document.getElementById("scanResults").classList.remove("hidden");
-  }
-
-  function showScanError(msg) {
-    const el = document.getElementById("scanError");
-    el.textContent = msg;
-    el.classList.remove("hidden");
-  }
-
-  // ── init ───────────────────────────────────────────────────────────────────
+function saveHFToken(token, username) {
+  localStorage.setItem(HF_KEY, token);
+  localStorage.setItem(HF_USER_KEY, username);
   updateHFUI();
-  loadStats();
+  updateAIStatus();
+}
+
+function removeHFToken() {
+  localStorage.removeItem(HF_KEY);
+  localStorage.removeItem(HF_USER_KEY);
+  updateHFUI();
+  updateAIStatus();
+}
+
+// ─── Welcome overlay ──────────────────────────────────────────────────────────
+function initWelcome() {
+  const overlay = document.getElementById("welcomeOverlay");
+  if (localStorage.getItem(WELCOME_KEY)) {
+    overlay.classList.add("hidden");
+    return;
+  }
+  document.getElementById("welcomeStart").addEventListener("click", () => {
+    localStorage.setItem(WELCOME_KEY, "1");
+    overlay.classList.add("hidden");
+  });
+}
+
+// ─── AI status bar ────────────────────────────────────────────────────────────
+let _serverHasAnthropic = false;
+let _serverHasHF = false;
+
+function updateAIStatus() {
+  const bar  = document.getElementById("aiStatusBar");
+  const text = document.getElementById("aiStatusText");
+  const prompt = document.getElementById("hfInlinePrompt");
+  const hfToken = getHFToken();
+
+  if (_serverHasAnthropic) {
+    bar.style.cssText = "background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);";
+    bar.querySelector(".dot").style.background = "#10b981";
+    text.textContent = "Vision AI ready — sees exactly what you point at";
+    text.style.color = "#10b981";
+    if (prompt) prompt.classList.add("hidden");
+  } else if (hfToken || _serverHasHF) {
+    bar.style.cssText = "background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);";
+    bar.querySelector(".dot").style.background = "#f59e0b";
+    text.textContent = hfToken
+      ? "Cloud AI active via your Hugging Face account"
+      : "Cloud AI active via shared Hugging Face token";
+    text.style.color = "#f59e0b";
+    if (prompt) prompt.classList.add("hidden");
+  } else {
+    bar.style.cssText = "background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);";
+    bar.querySelector(".dot").style.background = "#475569";
+    text.textContent = "No AI connected — connect Hugging Face below for free";
+    text.style.color = "#94a3b8";
+    if (prompt) prompt.classList.remove("hidden");
+  }
+}
+
+// ─── Stats / backend detection ────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const data = await (await fetch("/stats")).json();
+    document.getElementById("totalCount").textContent = data.total_concepts.toLocaleString();
+
+    _serverHasAnthropic = data.ai_backend.includes("anthropic");
+    _serverHasHF        = data.ai_backend.includes("huggingface");
+
+    // Anthropic chip in settings
+    const chip = document.getElementById("anthropicChip");
+    if (_serverHasAnthropic) {
+      chip.textContent = "active";
+      chip.style.cssText = "background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.3);color:#10b981;";
+    } else {
+      chip.textContent = "not configured";
+      chip.style.cssText = "background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1);color:#475569;";
+    }
+
+    updateAIStatus();
+  } catch (_) {}
+}
+
+// ─── HF UI sync ───────────────────────────────────────────────────────────────
+function updateHFUI() {
+  const token = getHFToken();
+  const user  = getHFUser();
+  const on    = !!token;
+
+  // Scan tab badge
+  const badge = document.getElementById("hfConnectBadge");
+  const label = document.getElementById("hfBadgeLabel");
+  if (on) {
+    badge.style.cssText = "background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.35);color:#10b981;";
+    label.textContent = "HF: on";
+  } else {
+    badge.style.cssText = "background:rgba(255,157,0,0.1);border-color:rgba(255,157,0,0.3);color:#ff9d00;";
+    label.textContent = "HF: off";
+  }
+
+  // Modal already-connected card
+  const card = document.getElementById("hfAlreadyConnected");
+  document.getElementById("hfConnectedUser").textContent = on ? "@" + user : "";
+  on ? card.classList.remove("hidden") : card.classList.add("hidden");
+
+  // Settings card
+  const chip = document.getElementById("settingsHFChip");
+  const row  = document.getElementById("settingsHFConnectedRow");
+  const btn  = document.getElementById("settingsHFBtnLabel");
+  document.getElementById("settingsHFUser").textContent = on ? "@" + user : "";
+  if (on) {
+    chip.textContent = "connected";
+    chip.style.cssText = "background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.3);color:#10b981;";
+    row.classList.remove("hidden");
+    btn.textContent = "Manage Connection";
+  } else {
+    chip.textContent = "not connected";
+    chip.style.cssText = "background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1);color:#475569;";
+    row.classList.add("hidden");
+    btn.textContent = "Connect Hugging Face — Free";
+  }
+}
+
+// ─── HF Modal ─────────────────────────────────────────────────────────────────
+function openHFModal() {
+  document.getElementById("hfModal").classList.add("open");
+  document.getElementById("hfTokenInput").value = "";
+  const msg = document.getElementById("hfValidationMsg");
+  msg.classList.add("hidden"); msg.textContent = "";
+}
+function closeHFModal() { document.getElementById("hfModal").classList.remove("open"); }
+
+document.getElementById("hfModalClose").addEventListener("click", closeHFModal);
+document.getElementById("hfModal").addEventListener("click", e => {
+  if (e.target === document.getElementById("hfModal")) closeHFModal();
+});
+document.getElementById("hfDisconnectBtn").addEventListener("click", () => { removeHFToken(); closeHFModal(); });
+document.getElementById("settingsHFDisconnect")?.addEventListener("click", removeHFToken);
+
+document.getElementById("hfSaveBtn").addEventListener("click", async () => {
+  const input = document.getElementById("hfTokenInput");
+  const msg   = document.getElementById("hfValidationMsg");
+  const btn   = document.getElementById("hfSaveBtn");
+  const token = input.value.trim();
+
+  if (!token) {
+    msg.textContent = "Please paste your token first.";
+    msg.className = "mt-1.5 text-[10px] text-amber-400"; msg.classList.remove("hidden");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-white border-t-transparent spinner"></div> Validating…`;
+  msg.classList.add("hidden");
+
+  try {
+    const res  = await fetch("/auth/validate-hf-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    const data = await res.json();
+    if (res.ok && data.valid) {
+      saveHFToken(token, data.username);
+      msg.textContent = `✓ Connected as @${data.username}`;
+      msg.className = "mt-1.5 text-[10px] text-emerald-400"; msg.classList.remove("hidden");
+      input.value = "";
+      setTimeout(closeHFModal, 1100);
+    } else {
+      msg.textContent = data.detail || "Token invalid. Please try again.";
+      msg.className = "mt-1.5 text-[10px] text-rose-400"; msg.classList.remove("hidden");
+    }
+  } catch (_) {
+    msg.textContent = "Could not reach server. Try again.";
+    msg.className = "mt-1.5 text-[10px] text-rose-400"; msg.classList.remove("hidden");
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<span class="material-icons-round text-base">verified</span> Validate &amp; Save`;
+});
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+const NAV_ICONS = { library: "auto_stories", scan: "radar", settings: "tune" };
+
+function switchTab(name) {
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("tab-" + name).classList.add("active");
+  Object.entries(NAV_ICONS).forEach(([t, icon]) => {
+    const btn  = document.getElementById("nav-" + t);
+    const ic   = btn.querySelector(".material-icons-round");
+    const lbl  = btn.querySelector("span:last-child");
+    const active = t === name;
+    ic.className  = "material-icons-round text-2xl " + (active ? "text-primary" : "text-slate-500");
+    lbl.className = "text-[10px] font-semibold " + (active ? "text-white" : "text-slate-500");
+  });
+}
+
+// ─── Filter buttons ───────────────────────────────────────────────────────────
+document.querySelectorAll(".filter-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filter-btn").forEach(b => {
+      b.className = b.className
+        .replace(/bg-primary\s*text-white\s*border-primary/g, "")
+        .replace(/\s+/g, " ").trim()
+        + " bg-white/5 text-slate-400 border-white/10";
+    });
+    btn.className = btn.className
+      .replace(/bg-white\/5\s*text-slate-400\s*border-white\/10/g, "")
+      .replace(/\s+/g, " ").trim()
+      + " bg-primary text-white border-primary";
+    S.type = btn.dataset.filter;
+    resetAndLoad();
+  });
+});
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+let searchTimer;
+document.getElementById("searchInput").addEventListener("input", e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { S.term = e.target.value.trim(); resetAndLoad(); }, 300);
+});
+
+// ─── Concept list state ───────────────────────────────────────────────────────
+const S = { page:1, size:20, term:"", type:"", loading:false, hasMore:true, stream:null };
+
+function resetAndLoad() {
+  S.page = 1; S.hasMore = true;
+  document.getElementById("conceptList").innerHTML =
+    `<div class="flex items-center justify-center py-16"><div class="w-6 h-6 rounded-full border-2 border-primary border-t-transparent spinner"></div></div>`;
   loadPage(true);
-  </script>
+}
+
+async function loadPage(replace = false) {
+  if (S.loading || (!S.hasMore && !replace)) return;
+  S.loading = true;
+  document.getElementById("loadMoreBtn").classList.add("hidden");
+  const p = new URLSearchParams({ page: S.page, size: S.size });
+  if (S.term) p.set("term", S.term);
+  if (S.type) p.set("type", S.type);
+  try {
+    const res  = await fetch(`/search?${p}`);
+    const data = await res.json();
+    if (replace) document.getElementById("conceptList").innerHTML = "";
+    if (data.items.length === 0 && replace) {
+      document.getElementById("conceptList").innerHTML =
+        `<p class="text-center text-sm text-slate-500 py-16">No results found.</p>`;
+    }
+    data.items.forEach(c => document.getElementById("conceptList").appendChild(conceptCard(c)));
+    S.page++;
+    S.hasMore = S.page <= data.total_pages;
+    document.getElementById("loadMoreBtn").classList.toggle("hidden", !S.hasMore);
+  } catch (_) {
+    if (replace)
+      document.getElementById("conceptList").innerHTML =
+        `<p class="text-center text-sm text-rose-400 py-16">Couldn't load concepts. Is the server running?</p>`;
+  } finally { S.loading = false; }
+}
+
+document.getElementById("loadMoreBtn").addEventListener("click", () => loadPage());
+
+// ─── Concept card ─────────────────────────────────────────────────────────────
+function conceptCard(c) {
+  const desc = c.description
+    ? c.description.replace(/</g,"&lt;").replace(/>/g,"&gt;").slice(0,120) + (c.description.length > 120 ? "…" : "")
+    : "No description available.";
+  const typeLabel = c.type === "mental_model" ? "Mental Model"
+    : c.type === "fallacy" ? "Fallacy" : "Bias";
+
+  const el = document.createElement("article");
+  el.className = "glass-card rounded-xl p-4 cursor-pointer hover:border-primary/35 active:scale-[0.99] transition-all";
+  el.innerHTML = `
+    <div class="flex items-start justify-between mb-2">
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase border type-${c.type}">${typeLabel}</span>
+        ${c.category ? `<span class="text-[10px] text-slate-600 truncate max-w-[150px]">${c.category}</span>` : ""}
+      </div>
+      ${c.url ? `<a href="${c.url}" target="_blank" rel="noopener" class="p-0.5 rounded hover:bg-white/10 text-slate-600 hover:text-primary transition-colors flex-shrink-0" onclick="event.stopPropagation()"><span class="material-icons-round text-sm">open_in_new</span></a>` : ""}
+    </div>
+    <h3 class="text-sm font-bold text-white mb-1.5 leading-snug">${c.name}</h3>
+    <p class="text-[11px] text-slate-500 leading-relaxed">${desc}</p>`;
+  el.addEventListener("click", () => openDetail(c));
+  return el;
+}
+
+// ─── Concept detail modal ─────────────────────────────────────────────────────
+function openDetail(c) {
+  const modal   = document.getElementById("detailModal");
+  const pills   = document.getElementById("detailPills");
+  const name    = document.getElementById("detailName");
+  const desc    = document.getElementById("detailDesc");
+  const wiki    = document.getElementById("detailWiki");
+  const wikiTxt = document.getElementById("detailWikiText");
+  const linkWrap= document.getElementById("detailLinkWrap");
+  const link    = document.getElementById("detailLink");
+
+  const typeLabel = c.type === "mental_model" ? "Mental Model" : c.type === "fallacy" ? "Fallacy" : "Bias";
+  pills.innerHTML = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold border type-${c.type}">${typeLabel}</span>` +
+    (c.category ? `<span class="text-[10px] text-slate-500">${c.category}${c.subcategory ? " › " + c.subcategory : ""}</span>` : "");
+  name.textContent = c.name;
+  desc.textContent = c.description || "No description available.";
+
+  wiki.classList.add("hidden"); wikiTxt.textContent = "";
+  if (c.url) {
+    linkWrap.classList.remove("hidden"); link.href = c.url;
+  } else {
+    linkWrap.classList.add("hidden");
+  }
+
+  modal.classList.add("open");
+
+  // Fetch Wikipedia summary lazily
+  if (c.url) {
+    const title = c.url.split("/").pop();
+    fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${title}`, {
+      headers: { "User-Agent": "CognitiveBiasCodex/2.0" }
+    })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (d && d.extract) {
+        wikiTxt.textContent = d.extract;
+        wiki.classList.remove("hidden");
+      }
+    })
+    .catch(() => {});
+  }
+}
+
+document.getElementById("detailClose").addEventListener("click", () => {
+  document.getElementById("detailModal").classList.remove("open");
+});
+document.getElementById("detailModal").addEventListener("click", e => {
+  if (e.target === document.getElementById("detailModal"))
+    document.getElementById("detailModal").classList.remove("open");
+});
+
+// ─── Daily pick ───────────────────────────────────────────────────────────────
+async function loadDailyPick() {
+  const today = new Date().toDateString();
+  let pick = null;
+  try {
+    const stored = JSON.parse(localStorage.getItem(DAILY_KEY) || "null");
+    if (stored && stored.date === today) { pick = stored.concept; }
+    else {
+      const res = await fetch("/concept/random?enrich=false");
+      pick = await res.json();
+      localStorage.setItem(DAILY_KEY, JSON.stringify({ date: today, concept: pick }));
+    }
+  } catch (_) { return; }
+  if (!pick) return;
+  document.getElementById("dailyPickName").textContent = pick.name;
+  document.getElementById("dailyPickDesc").textContent =
+    (pick.description || "").slice(0, 100) + (pick.description && pick.description.length > 100 ? "…" : "");
+  document.getElementById("dailyPick").classList.remove("hidden");
+  document.getElementById("dailyPickCard").addEventListener("click", () => openDetail(pick));
+}
+
+// ─── Camera ───────────────────────────────────────────────────────────────────
+const video    = document.getElementById("videoEl");
+const canvas   = document.getElementById("canvasEl");
+const scanBtn  = document.getElementById("scanBtn");
+const startBtn = document.getElementById("startCamBtn");
+
+startBtn.addEventListener("click", async () => {
+  if (S.stream) {
+    S.stream.getTracks().forEach(t => t.stop());
+    S.stream = null; video.srcObject = null;
+    document.getElementById("camPlaceholder").classList.remove("hidden");
+    startBtn.innerHTML = `<span class="material-icons-round text-base">videocam</span>Start Camera`;
+    scanBtn.disabled = true; scanBtn.style.opacity = "0.35";
+    return;
+  }
+  try {
+    S.stream = await navigator.mediaDevices.getUserMedia(
+      { video: { facingMode: "environment", width:{ideal:1280}, height:{ideal:720} } }
+    );
+    video.srcObject = S.stream;
+    document.getElementById("camPlaceholder").classList.add("hidden");
+    startBtn.innerHTML = `<span class="material-icons-round text-base">videocam_off</span>Stop Camera`;
+    scanBtn.disabled = false; scanBtn.style.opacity = "1";
+  } catch (_) {
+    showScanError("Camera access denied. Tap your browser's camera icon to allow it, then try again.");
+  }
+});
+
+scanBtn.addEventListener("click", async () => {
+  if (!S.stream) return;
+  canvas.width = video.videoWidth || 1280;
+  canvas.height = video.videoHeight || 720;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  const b64 = canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
+
+  document.getElementById("scanOverlay").classList.remove("hidden");
+  document.getElementById("scanResults").classList.add("hidden");
+  document.getElementById("scanError").classList.add("hidden");
+  scanBtn.disabled = true;
+
+  try {
+    const headers = { "Content-Type": "application/json" };
+    const hfToken = getHFToken();
+    if (hfToken) headers["X-HF-Token"] = hfToken;
+
+    const res  = await fetch("/analyze", {
+      method: "POST", headers,
+      body: JSON.stringify({ image: b64, media_type: "image/jpeg" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Analysis failed.");
+    renderResults(data);
+  } catch (e) { showScanError(e.message); }
+  finally {
+    document.getElementById("scanOverlay").classList.add("hidden");
+    scanBtn.disabled = false;
+  }
+});
+
+function renderResults(data) {
+  document.getElementById("sceneDesc").textContent = data.scene || "Scene analyzed.";
+  const list = document.getElementById("scanResultsInner");
+  list.innerHTML = "";
+  if (!data.detected || data.detected.length === 0) {
+    list.innerHTML = `<p class="text-center text-xs text-slate-500 py-6">No biases clearly identified in this scene. Try pointing at an ad or social media post.</p>`;
+  } else {
+    data.detected.forEach(d => {
+      const card = document.createElement("div");
+      card.className = "glass-card rounded-xl p-3 space-y-1.5 border border-white/5";
+      card.innerHTML = `
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="font-bold text-white text-sm leading-snug">${d.name}</span>
+          <span class="px-1.5 py-0.5 rounded text-[9px] font-bold border conf-${d.confidence||"medium"}">${d.confidence||"medium"}</span>
+          ${d.type ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold border type-${d.type}">${d.type.replace("_"," ")}</span>` : ""}
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">${d.reason}</p>
+        ${d.category ? `<p class="text-[10px] text-slate-600 font-mono">${d.category}${d.subcategory?" › "+d.subcategory:""}</p>` : ""}
+        ${d.url ? `<a href="${d.url}" target="_blank" rel="noopener" class="text-[10px] text-primary hover:underline inline-flex items-center gap-1"><span class="material-icons-round text-xs">open_in_new</span>Learn more</a>` : ""}`;
+      list.appendChild(card);
+    });
+  }
+  const notes = {
+    anthropic:   "✓ Vision AI — the camera image was fully analyzed",
+    huggingface: "⚠ Cloud text analysis — image wasn't processed (vision AI not configured)",
+    local_llm:   "⚠ Local text analysis — image wasn't processed",
+  };
+  document.getElementById("backendNote").textContent = notes[data.backend_used] || "";
+  document.getElementById("scanResults").classList.remove("hidden");
+}
+
+function showScanError(msg) {
+  document.getElementById("scanErrorText").textContent = msg;
+  document.getElementById("scanError").classList.remove("hidden");
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+initWelcome();
+updateHFUI();
+loadStats();
+loadPage(true);
+loadDailyPick();
+</script>
 </body>
 </html>
