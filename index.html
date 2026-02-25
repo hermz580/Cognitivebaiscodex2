@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShieldNode | Sovereign Intelligence & Protection</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet">
+
+    <!-- MediaPipe & Vision Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3713ec",
+                        "accent-cyan": "#00f0ff",
+                        "accent-purple": "#D000FF",
+                        "accent-magenta": "#ff0099",
+                        "accent-gold": "#FDB813",
+                        "background-dark": "#050510",
+                        "surface-dark": "#0f0c1d",
+                        "surface-glass": "rgba(20, 17, 34, 0.7)",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"],
+                    },
+                    backgroundImage: {
+                        'afro-pattern': "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%233713ec' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
+                        'grid-pattern': "linear-gradient(rgba(55, 19, 236, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(55, 19, 236, 0.05) 1px, transparent 1px)"
+                    }
+                },
+            },
+        }
+    </script>
+
+    <style>
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #050510;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3713ec;
+            border-radius: 2px;
+        }
+
+        .glass-panel {
+            background: rgba(20, 20, 40, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .glow-text-cyan {
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .glow-text-purple {
+            text-shadow: 0 0 10px rgba(208, 0, 255, 0.5);
+        }
+
+        .pulse-active {
+            animation: pulse-glow 3s infinite;
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(55, 19, 236, 0.2);
+            }
+
+            50% {
+                box-shadow: 0 0 15px rgba(55, 19, 236, 0.5);
+            }
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .neon-border {
+            box-shadow: 0 0 15px rgba(55, 19, 236, 0.25);
+        }
+
+        .face-capture-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4/5;
+            overflow: hidden;
+            border-radius: 24px;
+            background: #000;
+        }
+
+        #face-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #face-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            transform: scaleX(-1);
+        }
+
+        .analysis-card {
+            border-left: 3px solid;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .analysis-card:hover {
+            transform: translateX(4px);
+            background: rgba(55, 19, 236, 0.1);
+        }
+
+        /* Navigation transitions */
+        .content-section {
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-dark text-slate-100 font-display min-h-screen flex flex-col relative overflow-x-hidden selection:bg-primary selection:text-white">
+
+    <!-- Background Elements -->
+    <div class="fixed inset-0 z-0 bg-afro-pattern opacity-60 pointer-events-none"></div>
+    <div class="fixed inset-0 z-0 bg-grid-pattern bg-[length:40px_40px] opacity-20 pointer-events-none"></div>
+    <div
+        class="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-primary/20 blur-[120px] pointer-events-none">
+    </div>
+    <div
+        class="fixed bottom-[-10%] right-[-10%] w-[400px] h-[400px] rounded-full bg-accent-purple/10 blur-[100px] pointer-events-none">
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div
+        class="relative z-10 flex flex-col min-h-screen w-full max-w-md mx-auto border-x border-white/5 bg-background-dark/80 backdrop-blur-md shadow-2xl">
+
+        <!-- HEADER / STATUS -->
+        <header class="glass-panel sticky top-0 z-50 border-b border-white/10 px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-accent-cyan animate-pulse">wifi_tethering</span>
+                    <div>
+                        <h2 class="text-white text-xs font-bold tracking-[0.2em] leading-none uppercase">ShieldNode</h2>
+                        <p class="text-[9px] text-accent-cyan font-mono tracking-widest opacity-80 mt-1">UPLINK_STABLE
+                            // POSITIVE</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="sync-indicator" class="flex items-center gap-2">
+                        <div class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]">
+                        </div>
+                        <span class="text-[9px] text-white/50 font-mono" id="latency-display">12ms</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- SECTION: SCANNER (SHIELD) -->
+        <main id="shield-section" class="content-section flex-1 flex flex-col">
+            <div class="px-4 pt-8 pb-4 text-center">
+                <div class="relative flex flex-col items-center justify-center py-10">
+                    <div
+                        class="absolute w-48 h-48 rounded-full border border-white/5 animate-[spin_10s_linear_infinite]">
+                    </div>
+                    <div
+                        class="absolute w-40 h-40 rounded-full border border-primary/30 border-dashed animate-[spin_15s_linear_infinite_reverse]">
+                    </div>
+                    <div
+                        class="absolute w-32 h-32 rounded-full border-2 border-t-accent-cyan border-r-transparent border-b-accent-purple border-l-transparent animate-[spin_3s_linear_infinite]">
+                    </div>
+                    <div class="relative z-10 flex flex-col items-center gap-2">
+                        <span
+                            class="material-symbols-outlined text-4xl text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">security</span>
+                        <h1 class="text-2xl font-bold text-white tracking-tight glow-text-cyan">NEURAL SHIELD</h1>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-4 mb-6">
+                <div
+                    class="glass-panel rounded-xl p-1 relative group transition-all duration-300 focus-within:ring-1 focus-within:ring-accent-cyan/50">
+                    <div class="bg-background-dark/50 rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <label
+                                class="text-[10px] font-bold tracking-[0.2em] text-accent-purple uppercase flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[14px]">psychology</span>
+                                Bitstream Ingestion
+                            </label>
+                            <span class="text-[9px] font-mono text-white/30 truncate" id="char-count">SIZE:
+                                0/4096</span>
+                        </div>
+                        <textarea id="analyzer-input"
+                            class="w-full bg-transparent border-none text-white placeholder-white/20 focus:ring-0 text-sm font-mono leading-relaxed min-h-[160px] resize-none"
+                            placeholder="Paste text for heuristic analysis..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-4 mb-8">
+                <button id="analyze-btn"
+                    class="w-full relative group overflow-hidden rounded-xl bg-gradient-to-r from-primary to-[#2a0eb5] p-[1px] shadow-[0_0_20px_rgba(55,19,236,0.4)] transition-all">
+                    <div
+                        class="relative bg-background-dark/40 backdrop-blur-sm h-14 flex items-center justify-center gap-3 rounded-xl group-hover:bg-transparent transition-colors">
+                        <span
+                            class="material-symbols-outlined text-white transition-transform group-hover:scale-110">fingerprint</span>
+                        <span
+                            class="text-white font-bold tracking-[0.2em] text-sm glow-text-purple uppercase">Initialize
+                            Scan</span>
+                    </div>
+                </button>
+            </div>
+
+            <div id="analysis-results" class="px-4 hidden pb-20">
+                <h3 class="text-[10px] font-bold text-white/80 tracking-[0.3em] uppercase mb-4 flex items-center gap-2">
+                    <span class="w-1.5 h-4 bg-accent-cyan"></span>
+                    Detected Patterns
+                </h3>
+                <div id="results-grid" class="flex flex-col gap-4">
+                    <!-- Results go here -->
+                </div>
+            </div>
+        </main>
+
+        <!-- SECTION: CODEX (EXPLORER) -->
+        <main id="explorer-section" class="content-section flex-1 flex flex-col hidden">
+            <div class="pt-6 pb-2 px-5">
+                <h1
+                    class="text-2xl font-bold tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] uppercase italic">
+                    Intelligence DB</h1>
+
+                <div class="relative mt-4">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span class="material-symbols-outlined text-primary/60 text-sm">search</span>
+                    </div>
+                    <input id="search-input"
+                        class="block w-full pl-10 pr-4 py-3 bg-surface-dark border border-primary/30 rounded-xl text-sm placeholder-slate-500 focus:outline-none focus:border-primary transition-all text-white font-mono"
+                        placeholder="QUERY VECTOR...">
+                </div>
+            </div>
+
+            <div class="py-4 px-5 overflow-x-auto hide-scrollbar flex gap-3 border-b border-primary/10">
+                <button onclick="setFilter('All', this)"
+                    class="filter-btn flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/20 border border-primary text-white text-[10px] font-bold tracking-widest uppercase shadow-neon transition-all">
+                    ALL
+                </button>
+                <button onclick="setFilter('Bias', this)"
+                    class="filter-btn flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-dark border border-slate-800 text-slate-400 text-[10px] font-semibold tracking-widest uppercase hover:text-accent-cyan transition-all">
+                    Biases
+                </button>
+                <button onclick="setFilter('Fallacy', this)"
+                    class="filter-btn flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-dark border border-slate-800 text-slate-400 text-[10px] font-semibold tracking-widest uppercase hover:text-accent-magenta transition-all">
+                    Fallacies
+                </button>
+                <button onclick="setFilter('Mental Model', this)"
+                    class="filter-btn flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-dark border border-slate-800 text-slate-400 text-[10px] font-semibold tracking-widest uppercase hover:text-yellow-400 transition-all">
+                    Models
+                </button>
+            </div>
+
+            <div id="bias-grid" class="flex-1 overflow-y-auto px-4 py-6 space-y-4 pb-24 hide-scrollbar">
+                <!-- Cards injected here -->
+            </div>
+        </main>
+
+        <!-- SECTION: DATA NODE (STATS/ID) -->
+        <main id="node-section" class="content-section flex-1 flex flex-col hidden">
+            <div class="p-8 text-center">
+                <div
+                    class="w-32 h-32 mx-auto rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center mb-6">
+                    <span class="material-symbols-outlined text-6xl text-primary">person</span>
+                </div>
+                <h2 class="text-2xl font-bold text-white mb-2">Community Intelligence Node</h2>
+                <p class="text-xs text-brand-secondary/40 font-mono mb-10">RSA-4096 // ENCRYPTED_IDENTITY</p>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="glass-panel p-6 rounded-2xl text-center">
+                        <span id="stat-total" class="text-3xl font-bold text-white tracking-tighter">0</span>
+                        <p class="text-[9px] font-bold uppercase tracking-widest text-primary mt-2">Vectors</p>
+                    </div>
+                    <div class="glass-panel p-6 rounded-2xl text-center">
+                        <span class="text-3xl font-bold text-white tracking-tighter">100%</span>
+                        <p class="text-[9px] font-bold uppercase tracking-widest text-accent-cyan mt-2">Privacy</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- SECTION: VISAGE (ANCESTRAL SCANNER) -->
+        <main id="visage-section" class="content-section flex-1 flex flex-col hidden">
+            <div class="px-5 pt-8 pb-4">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <h2 class="text-[10px] font-bold tracking-[0.3em] text-accent-gold uppercase mb-1">Ancestral
+                            Intelligence</h2>
+                        <h1 class="text-2xl font-bold text-white tracking-tight glow-text-cyan">VISAGE ANALYSIS</h1>
+                    </div>
+                    <div class="bg-accent-gold/10 px-3 py-1 rounded-full border border-accent-gold/30">
+                        <span class="text-[9px] font-mono text-accent-gold font-bold">MODE: MULTI-TRADITION</span>
+                    </div>
+                </div>
+
+                <!-- Camera Terminal -->
+                <div class="face-capture-container border border-white/10 shadow-2xl mb-6">
+                    <video id="face-video" autoplay playsinline></video>
+                    <canvas id="face-canvas"></canvas>
+
+                    <!-- HUD Overlays -->
+                    <div
+                        class="absolute inset-4 border border-white/5 pointer-events-none flex flex-col justify-between">
+                        <div class="flex justify-between">
+                            <div class="w-4 h-4 border-t-2 border-l-2 border-accent-cyan/40"></div>
+                            <div class="w-4 h-4 border-t-2 border-r-2 border-accent-cyan/40"></div>
+                        </div>
+                        <div class="flex justify-between">
+                            <div class="w-4 h-4 border-b-2 border-l-2 border-accent-cyan/40"></div>
+                            <div class="w-4 h-4 border-b-2 border-r-2 border-accent-cyan/40"></div>
+                        </div>
+                    </div>
+
+                    <div id="visage-status"
+                        class="absolute bottom-4 left-4 right-4 py-2 px-3 bg-black/60 backdrop-blur-md rounded-lg border border-white/10 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                            <span class="text-[9px] font-mono text-white/70 uppercase tracking-widest"
+                                id="visage-log">System Ready</span>
+                        </div>
+                        <span class="text-[9px] font-mono text-accent-cyan" id="frame-latency">FPS: 0</span>
+                    </div>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex gap-3 mb-8">
+                    <button id="start-visage-btn"
+                        class="flex-1 bg-primary hover:bg-primary/80 text-white py-3 rounded-xl font-bold text-xs tracking-widest uppercase transition-all flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined text-lg">videocam</span>
+                        INIT UPLINK
+                    </button>
+                    <button id="capture-analysis-btn"
+                        class="flex-1 bg-surface-dark border border-white/10 text-white/50 py-3 rounded-xl font-bold text-xs tracking-widest uppercase transition-all flex items-center justify-center gap-2"
+                        disabled>
+                        <span class="material-symbols-outlined text-lg">center_focus_weak</span>
+                        READ FIELD
+                    </button>
+                </div>
+
+                <!-- Live Metrics Panels -->
+                <div class="grid grid-cols-3 gap-3 mb-8">
+                    <div class="glass-panel p-4 rounded-xl border-l-2 border-l-accent-cyan">
+                        <span
+                            class="text-[8px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Geometry</span>
+                        <div id="metric-shape" class="text-[10px] font-mono text-white">SYNC...</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl border-l-2 border-l-accent-magenta">
+                        <span
+                            class="text-[8px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Pulse</span>
+                        <div id="metric-emotion" class="text-[10px] font-mono text-white">SCAN...</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl border-l-2 border-l-accent-gold">
+                        <span class="text-[8px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Neural
+                            Age</span>
+                        <div id="metric-age" class="text-[10px] font-mono text-white">CALC...</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Bio-Cognitive Alignment Result -->
+            <div id="correlation-results" class="space-y-4 pb-24 hidden">
+                <div
+                    class="glass-panel p-6 rounded-3xl border-2 border-accent-cyan/30 bg-accent-cyan/5 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4">
+                        <span class="text-[8px] font-mono text-accent-cyan opacity-50">SYNC_ID: RS-882</span>
+                    </div>
+                    <div class="flex items-center gap-6 mb-6">
+                        <div class="relative w-24 h-24 flex items-center justify-center">
+                            <svg class="w-full h-full -rotate-90">
+                                <circle cx="48" cy="48" r="42" fill="none" stroke="currentColor" stroke-width="4"
+                                    class="text-white/5"></circle>
+                                <circle id="sync-progress" cx="48" cy="48" r="42" fill="none" stroke="currentColor"
+                                    stroke-width="4" stroke-dasharray="264" stroke-dashoffset="264"
+                                    class="text-accent-cyan transition-all duration-1000"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span id="sync-score" class="text-2xl font-bold text-white tracking-tighter">0%</span>
+                                <span
+                                    class="text-[7px] text-accent-cyan font-bold uppercase tracking-widest">Alignment</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white tracking-tight leading-none mb-1">Intelligence Sync
+                            </h3>
+                            <p class="text-[9px] text-slate-400 font-mono uppercase tracking-widest mb-3">Bio-Cognitive
+                                Correlation</p>
+                            <div id="protocol-badge"
+                                class="inline-block px-2 py-0.5 rounded bg-primary/20 border border-primary/40 text-[9px] font-bold text-primary uppercase tracking-tighter">
+                                ANALYZING...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <h4 class="text-[9px] font-bold text-white/50 uppercase tracking-[0.2em]">Neural Insights</h4>
+                        <div id="insight-list" class="space-y-2">
+                            <!-- Insights injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deep Intelligence Briefing (Phase 6) -->
+                <div id="deep-synthesis-section" class="mt-8 hidden">
+                    <div
+                        class="glass-panel p-8 rounded-[2rem] border-2 border-accent-gold/40 bg-accent-gold/5 relative overflow-hidden backdrop-blur-2xl">
+                        <div class="flex justify-between items-start mb-8">
+                            <div>
+                                <h3 class="text-[10px] font-bold text-accent-gold uppercase tracking-[0.3em] mb-1">Phase
+                                    6: Multi-Tradition</h3>
+                                <h2 class="text-2xl font-bold text-white tracking-tight">QUANTUM SYNTHESIS</h2>
+                            </div>
+                            <div class="text-right">
+                                <span id="profile-id" class="text-[9px] font-mono text-white/40 block mb-1">ID:
+                                    QS-XXXXXXXX</span>
+                                <div class="flex items-center gap-2 justify-end">
+                                    <span class="text-[8px] font-bold text-accent-gold uppercase">Sovereignty
+                                        Index</span>
+                                    <span id="sov-score" class="text-lg font-bold text-white font-mono">0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="prose prose-invert max-w-none mb-8">
+                            <p id="synthesis-briefing" class="text-sm leading-relaxed text-slate-300 italic">
+                                Calculating quantum-cultural alignment stream...
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-3 mb-8">
+                            <div class="p-4 bg-black/40 rounded-xl border border-white/5">
+                                <h4 class="text-[9px] font-bold text-accent-gold uppercase mb-2">Kemetic Logic</h4>
+                                <p id="brief-kemetic" class="text-[10px] text-slate-400 italic">...</p>
+                            </div>
+                            <div class="p-4 bg-black/40 rounded-xl border border-white/5">
+                                <h4 class="text-[9px] font-bold text-primary uppercase mb-2">Ayurvedic State</h4>
+                                <p id="brief-ayurvedic" class="text-[10px] text-slate-400 italic">...</p>
+                            </div>
+                            <div class="p-4 bg-black/40 rounded-xl border border-white/5">
+                                <h4 class="text-[9px] font-bold text-emerald-500 uppercase mb-2">Mian Xiang Pillar</h4>
+                                <p id="brief-mianxiang" class="text-[10px] text-slate-400 italic">...</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-[9px] font-bold text-white/50 uppercase tracking-[0.2em] mb-4">Tactical
+                                Recommendations</h4>
+                            <div id="recommendation-list" class="space-y-3">
+                                <!-- Recommendations injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    </div>
+    </main>
+
+    <!-- NAVIGATION -->
+    <nav
+        class="fixed bottom-0 max-w-md w-full z-100 glass-panel bg-[#050510]/90 border-t border-white/10 px-6 pb-8 pt-3">
+        <div class="flex justify-around items-center">
+            <button onclick="showSection('shield', this)"
+                class="nav-btn flex flex-col items-center gap-1.5 text-white/40 hover:text-white transition-colors">
+                <span class="material-symbols-outlined">qr_code_scanner</span>
+                <span class="text-[9px] font-bold tracking-widest uppercase">Scanner</span>
+            </button>
+            <button onclick="showSection('visage', this)"
+                class="nav-btn flex flex-col items-center gap-1.5 text-accent-cyan active-nav">
+                <span class="material-symbols-outlined">face</span>
+                <span class="text-[9px] font-bold tracking-widest uppercase">Visage</span>
+            </button>
+            <button onclick="showSection('explorer', this)"
+                class="nav-btn flex flex-col items-center gap-1.5 text-white/40 hover:text-white transition-colors">
+                <span class="material-symbols-outlined">map</span>
+                <span class="text-[9px] font-bold tracking-widest uppercase">Codex</span>
+            </button>
+            <button onclick="showSection('node', this)"
+                class="nav-btn flex flex-col items-center gap-1.5 text-white/40 hover:text-white transition-colors">
+                <span class="material-symbols-outlined">person</span>
+                <span class="text-[9px] font-bold tracking-widest uppercase">Node</span>
+            </button>
+        </div>
+    </nav>
+    </div>
+
+    <!-- DETAIL MODAL: VECTOR PROFILE -->
+    <div id="modal" class="fixed inset-0 z-[200] hidden">
+        <div class="absolute inset-0 bg-background-dark/95 backdrop-blur-3xl" onclick="closeModal()"></div>
+        <div class="absolute inset-0 overflow-y-auto pt-10 pb-24">
+            <div class="max-w-md mx-auto px-4" id="modal-content">
+                <!-- Vector Profile Design 3 injected here -->
+            </div>
+        </div>
+        <button onclick="closeModal()"
+            class="absolute top-6 right-6 w-10 h-10 rounded-full glass-panel flex items-center justify-center text-white">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+    </div>
+
+    <script>
+        let allItems = [];
+        let currentType = 'All';
+
+        // --- NAVIGATION LOGIC ---
+        function showSection(id, btn) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`${id}-section`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                b.classList.remove('text-accent-cyan');
+                b.classList.add('text-white/40');
+            });
+            if (btn) btn.classList.add('text-accent-cyan');
+            window.scrollTo(0, 0);
+        }
+
+        // --- DATA FETCHING ---
+        async function fetchAllData() {
+            try {
+                // Fetch biases with pagination
+                let allBiases = [];
+                let page = 1;
+                let totalPages = 1;
+                while (page <= totalPages) {
+                    const res = await fetch(`/search?page=${page}&size=100&enrich=false`);
+                    if (!res.ok) break;
+                    const data = await res.json();
+                    allBiases = allBiases.concat(data.items || []);
+                    totalPages = data.total_pages || 1;
+                    page++;
+                }
+
+                const [fRes, mRes] = await Promise.all([
+                    fetch('/fallacies').then(r => r.ok ? r.json() : []),
+                    fetch('/mental_models').then(r => r.ok ? r.json() : [])
+                ]);
+
+                // Normalize
+                const normalizedBiases = allBiases.map(b => ({ ...b, type: 'Bias' }));
+                const normalizedFallacies = fRes.map(f => ({
+                    id: f.id || f.name.toLowerCase().replace(/ /g, '_'),
+                    name: f.name,
+                    category: 'Logical Fallacy',
+                    type: 'Fallacy',
+                    wiki_summary: f.description || f.explanation_with_examples,
+                    url: f.url || '#'
+                }));
+                const normalizedModels = mRes.map(m => ({
+                    id: m.id || m.name.toLowerCase().replace(/ /g, '_'),
+                    name: m.name,
+                    category: m.category || 'Mental Model',
+                    type: 'Mental Model',
+                    wiki_summary: m.description,
+                    url: m.url || '#'
+                }));
+
+                allItems = [...normalizedBiases, ...normalizedFallacies, ...normalizedModels];
+                document.getElementById('stat-total').innerText = allItems.length;
+                filterAndRender();
+            } catch (error) {
+                console.error('Data Sync Failure', error);
+            }
+        }
+
+        // --- RENDER GRID ---
+        function filterAndRender() {
+            const term = document.getElementById('search-input').value.toLowerCase();
+            const filtered = allItems.filter(item => {
+                const matchesType = currentType === 'All' || item.type === currentType;
+                const matchesSearch = item.name.toLowerCase().includes(term) || (item.category && item.category.toLowerCase().includes(term));
+                return matchesType && matchesSearch;
+            });
+
+            const grid = document.getElementById('bias-grid');
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="p-20 text-center opacity-20 font-mono text-xs italic">ZERO_VECTORS_MATCH_QUERY</div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(item => {
+                const colorMap = { 'Bias': 'accent-cyan', 'Fallacy': 'accent-magenta', 'Mental Model': 'yellow-400' };
+                const iconMap = { 'Bias': 'visibility', 'Fallacy': 'psychology_alt', 'Mental Model': 'account_tree' };
+                const color = colorMap[item.type] || 'primary';
+                const icon = iconMap[item.type] || 'data_object';
+
+                return `
+                    <div class="glass-panel group relative p-5 rounded-2xl flex gap-5 transition-all hover:bg-primary/10 cursor-pointer overflow-hidden" onclick="showDetail('${item.id}', '${item.type}')">
+                        <div class="flex flex-col items-center">
+                            <div class="w-12 h-12 rounded-xl bg-surface-dark border border-primary/30 flex items-center justify-center group-hover:shadow-neon transition-all">
+                                <span class="material-symbols-outlined text-${color}">${icon}</span>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-start mb-1">
+                                <h3 class="text-white font-bold text-lg tracking-tight group-hover:text-accent-cyan transition-colors">${item.name}</h3>
+                                <span class="px-2 py-0.5 rounded bg-${color}/10 border border-${color}/20 text-${color} text-[8px] font-mono font-bold tracking-widest uppercase">
+                                    ${item.type.charAt(0)}V-${item.id.substring(0, 4)}
+                                </span>
+                            </div>
+                            <p class="text-slate-400 text-xs leading-relaxed line-clamp-2">${item.wiki_summary || 'Accessing intelligence profile...'}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setFilter(type, btn) {
+            currentType = type;
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.classList.remove('bg-primary/20', 'border-primary', 'text-white');
+                b.classList.add('bg-surface-dark', 'border-slate-800', 'text-slate-400');
+            });
+            btn.classList.add('bg-primary/20', 'border-primary', 'text-white');
+            filterAndRender();
+        }
+
+        // --- SCANNER ANALYSIS ---
+        const analyzeBtn = document.getElementById('analyze-btn');
+        analyzeBtn.addEventListener('click', async () => {
+            const text = document.getElementById('analyzer-input').value.trim();
+            if (!text) return;
+
+            const originalHTML = analyzeBtn.innerHTML;
+            analyzeBtn.innerHTML = `
+                <div class="relative bg-background-dark/40 h-14 flex items-center justify-center gap-3 rounded-xl">
+                    <span class="material-symbols-outlined text-white animate-spin">refresh</span>
+                    <span class="text-white font-bold tracking-widest text-xs uppercase">Decrypting Stream...</span>
+                </div>`;
+            analyzeBtn.disabled = true;
+
+            try {
+                const res = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                renderAnalysisResults(data.results);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                analyzeBtn.innerHTML = originalHTML;
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        function renderAnalysisResults(results) {
+            const container = document.getElementById('analysis-results');
+            const grid = document.getElementById('results-grid');
+            container.classList.remove('hidden');
+
+            if (results.length === 0) {
+                grid.innerHTML = `<div class="glass-panel p-6 rounded-xl text-center text-xs opacity-50 italic">NO_PATTERNS_DETECTED</div>`;
+                return;
+            }
+
+            grid.innerHTML = results.map(res => `
+                <div class="glass-panel rounded-xl p-5 relative overflow-hidden group hover:border-accent-purple/50 cursor-pointer" onclick="findAndShow('${res.name}', '${res.type}')">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="text-white font-bold text-base">${res.name}</h4>
+                            <span class="text-[9px] text-accent-purple font-mono uppercase tracking-widest">${res.type} Detected</span>
+                        </div>
+                        <div class="flex items-center gap-1 bg-accent-purple/20 px-2 py-1 rounded border border-accent-purple/30">
+                            <span class="text-[10px] font-bold text-accent-purple">${res.confidence}</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-brand-secondary/40 leading-relaxed truncate">${res.context}</p>
+                    <div class="w-full bg-white/5 rounded-full h-1 mt-4">
+                        <div class="bg-primary h-full w-[${res.confidence === 'High' ? '90%' : '60%'}]"></div>
+                    </div>
+                </div>
+            `).join('');
+            container.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function findAndShow(name, type) {
+            const item = allItems.find(i => i.name.toLowerCase() === name.toLowerCase() && i.type === type);
+            if (item) showDetail(item.id, item.type);
+        }
+
+        // --- DETAIL PROFILE MODAL ---
+        function showDetail(id, type) {
+            const item = allItems.find(i => i.id === id && i.type === type);
+            if (!item) return;
+
+            const modal = document.getElementById('modal');
+            const content = document.getElementById('modal-content');
+
+            const colorMap = { 'Bias': 'accent-cyan', 'Fallacy': 'accent-magenta', 'Mental Model': 'yellow-400' };
+            const color = colorMap[item.type] || 'primary';
+
+            content.innerHTML = `
+                <div class="animate-in fade-in slide-in-from-bottom-5 duration-300">
+                    <header class="flex flex-col items-center text-center gap-6 mb-10 mt-4 relative">
+                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/20 blur-[80px] rounded-full"></div>
+                        <div class="relative w-28 h-28 flex items-center justify-center">
+                            <div class="absolute inset-0 border border-primary/30 rounded-full animate-[spin_10s_linear_infinite]"></div>
+                            <div class="w-20 h-20 rounded-full bg-surface-card border border-primary flex items-center justify-center text-white neon-border">
+                                <span class="material-symbols-outlined text-4xl neon-text">psychology_alt</span>
+                            </div>
+                            <div class="absolute -bottom-2 bg-red-500 text-white text-[9px] font-bold px-3 py-1 rounded-full border border-red-900 shadow-xl uppercase tracking-tighter">
+                                ACTIVE_THREAT
+                            </div>
+                        </div>
+                        <div>
+                            <h1 class="text-3xl font-bold text-white tracking-tight uppercase leading-tight">${item.name}</h1>
+                            <div class="flex items-center justify-center gap-3 text-[10px] font-mono text-primary/80 tracking-widest mt-2 uppercase">
+                                <span>Class: ${item.type}</span>
+                                <span class="w-1 h-1 bg-primary rounded-full"></span>
+                                <span>Node: ${item.id.substring(0, 8)}</span>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div class="flex flex-col gap-5">
+                        <section class="bg-surface-card/60 p-6 rounded-2xl border border-white/5 backdrop-blur-md">
+                            <div class="flex items-center gap-3 mb-4">
+                                <span class="material-symbols-outlined text-primary text-sm">function</span>
+                                <h3 class="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold">Vector Logic</h3>
+                            </div>
+                            <p class="text-sm leading-relaxed text-slate-300 mb-6 font-light italic">"${item.wiki_summary || 'Accessing neural profile...'}"</p>
+                            
+                            <div class="p-4 bg-black/40 rounded-xl border border-white/5 font-mono text-[11px] text-slate-400 leading-relaxed italic">
+                                <span class="text-primary italic">if</span> (pattern_detected) {<br/>
+                                &nbsp;&nbsp;<span class="text-accent-cyan">deploy</span>(countermeasure);<br/>
+                                &nbsp;&nbsp;<span class="text-accent-magenta">alert</span>(node_community);<br/>
+                                }
+                            </div>
+                        </section>
+
+                        <section class="bg-gradient-to-br from-surface-card to-primary/10 border border-primary/20 rounded-2xl p-6 relative overflow-hidden">
+                            <div class="flex items-center justify-between mb-5">
+                                <div class="flex items-center gap-3">
+                                    <span class="material-symbols-outlined text-primary text-sm">shield</span>
+                                    <h3 class="text-[10px] uppercase tracking-[0.2em] text-white font-bold">Defense Protocols</h3>
+                                </div>
+                                <span class="text-[9px] bg-primary/20 text-primary px-3 py-1 rounded border border-primary/30 font-bold">CODEX_LOADED</span>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="flex items-center gap-4 p-3 bg-surface-dark/60 rounded-xl border border-white/5">
+                                    <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/20 text-primary">
+                                        <span class="material-symbols-outlined text-xl italic font-bold">balance</span>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Cognitive Audit</h4>
+                                        <p class="text-[10px] text-slate-400 italic">Deploying awareness to neutralize bias distortion.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <a href="${item.url}" target="_blank" class="w-full h-16 bg-surface-card border-l-4 border-l-primary flex items-center justify-between px-6 rounded-r-2xl hover:bg-primary/5 transition-all">
+                            <div class="flex flex-col">
+                                <span class="text-xs font-bold text-white uppercase tracking-widest">Research Node</span>
+                                <span class="text-[9px] text-slate-500 font-mono italic">ESTABLISHING_LINK...</span>
+                            </div>
+                            <span class="material-symbols-outlined text-primary">open_in_new</span>
+                        </a>
+                    </div>
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        // --- VISAGE ENGINE (MEDIAPIPE) ---
+        let faceLandmarker;
+        let runningMode = "IMAGE";
+        let webcamRunning = false;
+        const video = document.getElementById("face-video");
+        const canvasElement = document.getElementById("face-canvas");
+        const canvasCtx = canvasElement.getContext("2d");
+
+        async function createFaceLandmarker() {
+            const filesetResolver = await window.FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+            );
+            faceLandmarker = await window.FaceLandmarker.createFromOptions(filesetResolver, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                    delegate: "GPU"
+                },
+                outputFaceBlendshapes: true,
+                runningMode: "VIDEO",
+                numFaces: 1
+            });
+            document.getElementById('visage-log').innerText = "Neural Engine Loaded";
+        }
+
+        async function predictWebcam() {
+            canvasElement.width = video.videoWidth;
+            canvasElement.height = video.videoHeight;
+
+            let startTimeMs = performance.now();
+            if (faceLandmarker) {
+                const results = faceLandmarker.detectForVideo(video, startTimeMs);
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+                if (results.faceLandmarks) {
+                    for (const landmarks of results.faceLandmarks) {
+                        // Draw customized high-tech grid
+                        drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: "rgba(0, 240, 255, 0.2)", lineWidth: 0.5 });
+                        drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, { color: "#00f0ff" });
+                        drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, { color: "#00f0ff" });
+                        drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, { color: "#D000FF", lineWidth: 1 });
+
+                        // Basic Logic for Shape/Emotion (Placeholder for real models)
+                        const shapes = results.faceBlendshapes[0].categories;
+                        const joy = shapes.find(s => s.categoryName === 'jawOpen')?.score || 0;
+
+                        window.currentBlendshapes = {};
+                        shapes.forEach(s => {
+                            window.currentBlendshapes[s.categoryName] = s.score;
+                        });
+
+                        document.getElementById('metric-emotion').innerText = joy > 0.3 ? "OPEN" : "OBSERVING";
+                        document.getElementById('metric-shape').innerText = "LOCK_ON";
+
+                        // Mock Age Estimation based on eye squinting intensity
+                        const squint = (window.currentBlendshapes['eyeSquintLeft'] + window.currentBlendshapes['eyeSquintRight']) / 2;
+                        document.getElementById('metric-age').innerText = `${Math.round(25 + (squint * 20))}_EST`;
+                    }
+                }
+            }
+
+            if (webcamRunning) {
+                window.requestAnimationFrame(predictWebcam);
+            }
+        }
+
+        document.getElementById('start-visage-btn').addEventListener('click', async () => {
+            document.getElementById('visage-log').innerText = "Initializing Neural Engine...";
+            if (!faceLandmarker) await createFaceLandmarker();
+
+            if (webcamRunning) {
+                webcamRunning = false;
+                video.srcObject.getTracks().forEach(track => track.stop());
+                document.getElementById('start-visage-btn').innerHTML = '<span class="material-symbols-outlined text-lg">videocam</span> INIT UPLINK';
+                document.getElementById('visage-log').innerText = "System Ready";
+            } else {
+                webcamRunning = true;
+                const constraints = { video: true };
+                navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+                    video.srcObject = stream;
+                    video.addEventListener("loadeddata", predictWebcam);
+                    document.getElementById('start-visage-btn').innerHTML = '<span class="material-symbols-outlined text-lg">videocam_off</span> TERMINATE';
+                    document.getElementById('capture-analysis-btn').disabled = false;
+                    document.getElementById('capture-analysis-btn').classList.remove('text-white/50');
+                    document.getElementById('capture-analysis-btn').classList.add('text-white');
+                    document.getElementById('visage-log').innerText = "Uplink Established";
+                });
+            }
+        });
+
+        // Intelligence Correlation Synthesis
+        document.getElementById('capture-analysis-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('capture-analysis-btn');
+            const originalHTML = btn.innerHTML;
+            const log = document.getElementById('visage-log');
+            const textToCorrelate = document.getElementById('analyzer-input').value.trim();
+
+            log.innerText = "SYNTHESIZING TRADITIONS...";
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin">refresh</span> SYNCING...';
+
+            try {
+                // Call correlation endpoint
+                const res = await fetch('/intelligence/correlate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: textToCorrelate || "Observing quietude. Internal patterns stabilizing.",
+                        visage: {
+                            blendshapes: window.currentBlendshapes || {},
+                            landmarks: []
+                        }
+                    })
+                });
+
+                const data = await res.json();
+                renderCorrelationResults(data);
+
+                // Phase 6: Call Deep Synthesis
+                await performDeepSynthesis();
+
+            } catch (e) {
+                console.error("Correlation Failure", e);
+                log.innerText = "SYNTHESIZING ERROR";
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        });
+
+        async function performDeepSynthesis() {
+            const res = await fetch('/intelligence/synthesis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    visage: {
+                        blendshapes: window.currentBlendshapes || {},
+                        landmarks: []
+                    }
+                })
+            });
+
+            const data = await res.json();
+
+            document.getElementById('deep-synthesis-section').classList.remove('hidden');
+            document.getElementById('synthesis-briefing').innerText = data.quantum_briefing;
+            document.getElementById('profile-id').innerText = `ID: ${data.profile_id}`;
+            document.getElementById('sov-score').innerText = data.sovereignty_score.toFixed(2);
+
+            document.getElementById('brief-kemetic').innerText = data.tradition_breakdown.Kemetic;
+            document.getElementById('brief-ayurvedic').innerText = data.tradition_breakdown.Ayurvedic;
+            document.getElementById('brief-mianxiang').innerText = data.tradition_breakdown['Mian Xiang'];
+
+            const recList = document.getElementById('recommendation-list');
+            recList.innerHTML = data.recommendations.map(rec => `
+                <div class="flex gap-4 items-center p-3 bg-white/5 rounded-xl border border-white/5">
+                    <span class="material-symbols-outlined text-accent-gold text-lg">bolt</span>
+                    <p class="text-[10px] text-slate-300 font-bold uppercase tracking-wider">${rec}</p>
+                </div>
+            `).join('');
+
+            document.getElementById('deep-synthesis-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function renderCorrelationResults(data) {
+            const container = document.getElementById('correlation-results');
+            const traditions = document.querySelectorAll('.analysis-card').forEach(c => c.parentElement.classList.add('hidden'));
+            // Hide traditions to focus on correlation, or keep both? Let's show correlation at the top.
+
+            container.classList.remove('hidden');
+
+            const scorePercent = Math.round(data.synchronicity * 100);
+            const progressCircle = document.getElementById('sync-progress');
+            const scoreDisplay = document.getElementById('sync-score');
+            const protocolBadge = document.getElementById('protocol-badge');
+            const insightList = document.getElementById('insight-list');
+
+            // SVG Stroke math: 2 * PI * R (R=42) = ~264
+            const offset = 264 - (264 * data.synchronicity);
+            progressCircle.style.strokeDashoffset = offset;
+            scoreDisplay.innerText = `${scorePercent}%`;
+
+            protocolBadge.innerText = data.defense_protocol;
+            protocolBadge.className = `inline-block px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-tighter ${data.synchronicity < 0.5 ? 'bg-red-500/20 border-red-500/40 text-red-500' :
+                data.synchronicity < 0.8 ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-500' :
+                    'bg-emerald-500/20 border-emerald-500/40 text-emerald-500'
+                }`;
+
+            insightList.innerHTML = `
+                <div class="p-3 bg-white/5 rounded-xl border border-white/10 mb-4">
+                    <p class="text-[11px] text-accent-cyan font-mono italic leading-relaxed">
+                        <span class="text-white font-bold uppercase">Sovereign Synthesis:</span> 
+                        "${data.insights[0] || 'No incongruence detected in current buffer.'} Recommendation: ${data.defense_protocol}."
+                    </p>
+                </div>
+            ` + data.insights.map((insight, i) => i === 0 ? '' : `
+                <div class="flex gap-3 items-start">
+                    <span class="material-symbols-outlined text-[12px] text-accent-magenta mt-0.5">warning</span>
+                    <p class="text-[10px] text-slate-400 leading-tight">${insight}</p>
+                </div>
+            `).join('');
+
+            container.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Helper for MediaPipe drawing
+        function drawConnectors(ctx, landmarks, connections, style) {
+            ctx.strokeStyle = style.color || "#fff";
+            ctx.lineWidth = style.lineWidth || 1;
+            ctx.beginPath();
+            for (const connection of connections) {
+                const from = landmarks[connection.start];
+                const to = landmarks[connection.end];
+                if (from && to) {
+                    ctx.moveTo(from.x * canvasElement.width, from.y * canvasElement.height);
+                    ctx.lineTo(to.x * canvasElement.width, to.y * canvasElement.height);
+                }
+            }
+            ctx.stroke();
+        }
+
+        // --- INIT ---
+        fetchAllData();
+        document.getElementById('search-input').addEventListener('input', filterAndRender);
+        document.getElementById('analyzer-input').addEventListener('input', (e) => {
+            document.getElementById('char-count').innerText = `SIZE: ${e.target.value.length}/4096`;
+        });
+    </script>
+</body>
+
+</html>

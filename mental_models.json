@@ -1,0 +1,134 @@
+[
+    {
+        "name": "First Principles",
+        "description": "The practice of actively questioning every assumption you think you 'know' about a given problem or scenario and then creating new knowledge and solutions from scratch.",
+        "category": "General Thinking",
+        "example": "Elon Musk reasoning that battery packs are expensive due to the market price, but the material cost is low, so he decided to make them himself."
+    },
+    {
+        "name": "Second-Order Thinking",
+        "description": "Thinking about the consequences of the consequences. First-order thinking is looking at the immediate result of an action. Second-order thinking is looking at the result of that result.",
+        "category": "Decision Making",
+        "example": "First order: 'I'm hungry, I'll eat this chocolate cake.' Second order: 'If I eat this cake, I'll crash in an hour and feel sluggish for my meeting.'"
+    },
+    {
+        "name": "Occam's Razor",
+        "description": "The principle that when presented with competing hypotheses about the same prediction, one should select the solution with the fewest assumptions.",
+        "category": "Problem Solving",
+        "example": "If you hear hoofbeats, think horses, not zebras (unless you are in the Serengeti)."
+    },
+    {
+        "name": "Hanlon's Razor",
+        "description": "Never attribute to malice that which is adequately explained by stupidity (or negligence).",
+        "category": "Social",
+        "example": "Ensure you don't burn bridges with a colleague who missed a deadline; they likely just forgot rather than trying to sabotage you."
+    },
+    {
+        "name": "Pareto Principle",
+        "description": "The 80/20 rule, which states that for many events, roughly 80% of the effects come from 20% of the causes.",
+        "category": "Productivity",
+        "example": "20% of the bugs cause 80% of the crashes. Fix those 20% first."
+    },
+    {
+        "name": "Map is not the Territory",
+        "description": "The map of reality is not reality itself. Even the best maps are imperfect. That's because they are reductions of what they represent.",
+        "category": "General Thinking",
+        "example": "A financial model (map) might predict growth, but a sudden pandemic (territory) changes the reality regardless of the model."
+    },
+    {
+        "name": "Inversion",
+        "description": "The practice of thinking through problems in reverse. Instead of asking how to do something, ask how to not do it.",
+        "category": "Problem Solving",
+        "example": "Instead of asking 'How can I be happy?', ask 'What makes me miserable?' and avoid those things."
+    },
+    {
+        "name": "Circle of Competence",
+        "description": "The subject area which matches a person's skills or expertise. You should play games where you have the aptitude and stay within your circle.",
+        "category": "Decision Making",
+        "example": "Warren Buffett investing only in businesses he understands (e.g., Coca-Cola) and avoiding tech stocks during the dot-com bubble."
+    },
+    {
+        "name": "Probabilistic Thinking",
+        "description": "The ability to estimate the likelihood of any specific outcome coming to pass. It is the opposite of deterministic thinking.",
+        "category": "Numeracy",
+        "example": "Instead of saying 'We will launch on time', say 'There is an 85% chance we will launch on time based on current velocity.'"
+    },
+    {
+        "name": "Sunk Cost Fallacy",
+        "description": "The tendency to continue with an endeavor we've invested money, effort, or time into, even if the current costs outweigh the benefits.",
+        "category": "Economics/Psychology",
+        "example": "Sitting through a terrible movie just because you paid for the ticket."
+    },
+    {
+        "name": "Compound Interest",
+        "description": "The addition of interest to the principal sum of a loan or deposit, or in other words, interest on interest. Applies to habits and learning too.",
+        "category": "Economics",
+        "example": "Reading 20 pages a day seems small, but over a year it's 30 books, which creates a massive knowledge advantage."
+    },
+    {
+        "name": "Bayesian Updating",
+        "description": "The process of updating the probability for a hypothesis as more evidence or information becomes available.",
+        "category": "Numeracy",
+        "example": "You think it will rain (50%). You see dark clouds (New Evidence). You update your belief to 80%."
+    },
+    {
+        "name": "Feedback Loops",
+        "description": "A system where outputs of a system are circled back and used as inputs. Can be positive (amplifying) or negative (stabilizing).",
+        "category": "Systems Thinking",
+        "example": "Microphone screeching (Positive Feedback loop) vs Thermostat (Negative Feedback loop)."
+    },
+    {
+        "name": "Critical Mass",
+        "description": "The minimum amount of something required to start or maintain a venture.",
+        "category": "Physics/Business",
+        "example": "A social network needs a critical mass of users before it becomes useful to anyone."
+    },
+    {
+        "name": "Activation Energy",
+        "description": "The minimum quantity of energy that the reacting species must possess in order to undergo a specified reaction.",
+        "category": "Physics/Productivity",
+        "example": "The hardest part of writing is writing the first sentence. Once started, the activation energy is overcome."
+    },
+    {
+        "name": "Leverage",
+        "description": "Using a small amount of input to gain a large amount of output.",
+        "category": "Physics/Business",
+        "example": "Using software (code) to serve millions of users with zero marginal cost of replication."
+    },
+    {
+        "name": "Scarcity",
+        "description": "The limited availability of a commodity, which may be in demand in the market or by the commons.",
+        "category": "Economics/Psychology",
+        "example": "limited time offers create a sense of scarcity that drives sales."
+    },
+    {
+        "name": "Structural/Systemic Bias",
+        "description": "The tendency of a system to produce results that are skewed in favor of or against one group of people compared to another.",
+        "category": "Sociology",
+        "example": "Algorithms trained on historical hiring data may replicate the bias against hiring women for technical roles."
+    },
+    {
+        "name": "Reason from First Principles",
+        "description": "Breaking a problem down to the basic elements and then reassembling it from the ground up.",
+        "category": "Problem Solving",
+        "example": "SpaceX reducing the cost of rockets by looking at the raw material cost of aluminum and fuel rather than the market price of rockets."
+    },
+    {
+        "name": "Regret Minimization Framework",
+        "description": "Projecting yourself to age 80 and asking, 'Will I regret not doing this?'",
+        "category": "Decision Making",
+        "example": "Jeff Bezos quitting his job to start Amazon because he knew he would regret not trying, but wouldn't regret failing."
+    },
+    {
+        "name": "Data Sovereignty",
+        "description": "The principle that a community or individual has the right to own, control, and govern the collection, application, and use of their data.",
+        "category": "Liberation Technology",
+        "example": "BlaqVox returning data power to the community by monitoring government APIs directly rather than relying on curated reports."
+    },
+    {
+        "name": "Community Intelligence",
+        "description": "The collective insight generated when local residents, activists, and data analysts collaborate to identify and mitigate threats in real-time.",
+        "category": "Liberation Technology",
+        "example": "Aggregating ACLU civil rights cases with real-time threat detection to protect target communities in Seattle, Chicago, and Atlanta."
+    }
+]

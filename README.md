@@ -1,79 +1,46 @@
-# Cognitive Bias Codex MCP
+# ShieldNode | Sovereign Intelligence & Protection (v4.0)
 
-A robust [Model Context Protocol (MCP)](https://www.anthropic.com/index/model-context-protocol) server that provides structured data on cognitive biases, enriched with live Wikipedia summaries.
+## 1. Project Overview
 
-## 🚀 Features
+**ShieldNode** is a comprehensive Community Intelligence & Protection Platform. Originally focused on cognitive bias detection, it has evolved into a multi-modal biometric and heuristic analysis node. It empowers users to recognize automated patterns in both discourse (via the Codex) and self-visage (via Ancestral Visage Analysis), promoting cognitive and spiritual sovereignty.
 
-* **Fast In-Memory Cache**: Loads `bias.csv` at startup for sub-millisecond reads.
-* **Enrichment**: Dynamically fetches and caches summaries from Wikipedia API.
-* **Pagination**: Full support for `page` and `size` parameters on search.
-* **Observability**: Built-in Prometheus metrics at `/metrics`.
-* **Structured Logging**: Production-ready JSON-friendly logging format.
-* **OpenAPI**: Automatic Swagger UI at `/docs`.
+## 2. Design Philosophy & Rationale
 
-## 🛠️ Stack
+- **Aesthetic**: "Bio-Digital HUD" — A synthesis of Afro-tech aesthetics, ancestral wisdom, and modern neural geometry.
+- **Functionality**: Local-first biometric processing using MediaPipe. High-fidelity feedback loops provide immediate insight into internal states.
+- **Ethical Implication**: By merging traditional face-reading wisdom with modern AI, we create a cultural mirror that reclaims biometric data for personal empowerment rather than state surveillance.
 
-* **Python 3.10+**
-* **FastAPI** (Web Framework)
-* **Uvicorn** (ASGI Server)
-* **HTTPX** (Async HTTP Client)
-* **Prometheus Instrumentator** (Metrics)
+## 3. System Architecture & Data Flow
 
-## 🏃 Quick Start
-
-### 1. Install Dependencies
-
-```bash
-pip install -r requirements.txt
+```mermaid
+graph TD
+    A[Frontend: index.html] -->|Heuristic Stream| B[FastAPI Backend: main.py]
+    A -->|Biometric Stream| F[MediaPipe: Face Landmarker]
+    F -->|Landmarks/Blendshapes| G[Local Synthesis Engine]
+    B -->|Read| C[Data: bias.csv]
+    B -->|Async Fetch| D[External: Wikipedia API]
+    G -->|Interpretation| H[Ancestral Profiles: Kemetic/Ayurvedic/Mian Xiang]
 ```
 
-### 2. Run Server
+## 4. Component Analysis
 
-```bash
-uvicorn main:app --reload
-```
+### `main.py`
 
-### 3. Usage
+- **Purpose**: Heuristic analysis and Codex data provider.
+- **Output**: JSON responses for text patterns and bias profiles.
 
-**Search Biases (Paginated)**
+### `index.html` (The Dashboard)
 
-```bash
-GET /search?term=confirmation&page=1&size=10
-```
+- **Purpose**: Single-page Command Center.
+- **Modules**:
+  - **Scanner**: Text heuristic analysis.
+  - **Visage**: Real-time biometric ancestral mapping.
+  - **Codex**: Intelligence DB of 80+ patterns.
+  - **Node**: Identity and privacy management.
 
-**Get Detail (Enriched)**
+## 9. Action Plan & Next Steps
 
-```bash
-GET /bias/confirmation_bias
-```
-
-**Check Health**
-
-```bash
-GET /health
-```
-
-**View Metrics**
-
-```bash
-GET /metrics
-```
-
-## 📊 Data Schema (`bias.csv`)
-
-| Column | Description |
-| :--- | :--- |
-| `id` | Unique slug (e.g., `confirmation_bias`) |
-| `name` | Display name |
-| `category` | Broad grouping (Decision-making, Social, Memory) |
-| `subcategory` | Optional specific group |
-| `url` | Wikipedia URL source |
-| `wiki_summary` | Cached summary text (empty in CSV, filled by API) |
-
-## 🧪 Testing
-
-Run the included test harness:
-
-```bash
-python test_mcp.py
-```
+- [x] **Phase 4**: Integrated MediaPipe Ancestral Visage module.
+- [ ] **Phase 5**: Real-time Emotional Bias detection during video calls.
+- [ ] **Phase 6**: Integrate LLM (Claude/Gemini) for deep cultural synthesis of visage data.
+- [ ] **Phase 7**: Decentralized P2P node syncing for community alerts (GunDB).
