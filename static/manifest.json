@@ -1,0 +1,38 @@
+{
+  "name": "Cognitive Bias Codex",
+  "short_name": "Bias Codex",
+  "description": "Identify cognitive biases, logical fallacies, and mental models with your camera.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#101322",
+  "theme_color": "#1337ec",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%231337ec'/%3E%3Ctext x='96' y='128' font-size='100' text-anchor='middle' font-family='serif' fill='white'%3E🧠%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%231337ec'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle' font-family='serif' fill='white'%3E🧠%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Scan Now",
+      "url": "/?tab=scan",
+      "description": "Open the camera scanner"
+    },
+    {
+      "name": "Library",
+      "url": "/?tab=library",
+      "description": "Browse the bias library"
+    }
+  ]
+}

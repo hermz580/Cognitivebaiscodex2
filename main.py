@@ -7,7 +7,9 @@ import logging
 import os
 import random
 import re
+import sqlite3
 import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -16,7 +18,7 @@ import httpx
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
@@ -102,7 +104,62 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeResponse(BaseModel):
     scene: str
     detected: List[DetectedConcept]
-    backend_used: str       # "anthropic" | "local_llm" | "none"
+    backend_used: str       # "anthropic" | "huggingface" | "local_llm" | "none"
+    result_id: Optional[str] = None   # permalink token
+
+
+# ── SQLite result store ───────────────────────────────────────────────────────
+
+_DB_PATH = Path("scan_results.db")
+_RESULT_TTL_DAYS = 30
+
+
+def _init_db() -> None:
+    """Create the results table and prune old entries."""
+    conn = sqlite3.connect(_DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS scan_results (
+            id           TEXT PRIMARY KEY,
+            ts           INTEGER NOT NULL,
+            scene        TEXT,
+            detected     TEXT,
+            backend_used TEXT
+        )
+    """)
+    cutoff = int(time.time()) - _RESULT_TTL_DAYS * 86400
+    conn.execute("DELETE FROM scan_results WHERE ts < ?", (cutoff,))
+    conn.commit()
+    conn.close()
+
+
+def _save_result(scene: str, detected: list, backend_used: str) -> str:
+    result_id = uuid.uuid4().hex[:10]
+    conn = sqlite3.connect(_DB_PATH)
+    conn.execute(
+        "INSERT INTO scan_results (id, ts, scene, detected, backend_used) VALUES (?, ?, ?, ?, ?)",
+        (result_id, int(time.time()), scene, json.dumps(detected), backend_used),
+    )
+    conn.commit()
+    conn.close()
+    return result_id
+
+
+def _get_result(result_id: str) -> Optional[dict]:
+    conn = sqlite3.connect(_DB_PATH)
+    row = conn.execute(
+        "SELECT id, ts, scene, detected, backend_used FROM scan_results WHERE id = ?",
+        (result_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row[0],
+        "ts": row[1],
+        "scene": row[2],
+        "detected": json.loads(row[3]),
+        "backend_used": row[4],
+    }
 
 
 # ── In-memory caches ─────────────────────────────────────────────────────────
@@ -503,6 +560,7 @@ def _detect_ai_backend() -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Cognitive Bias Codex server…")
+    _init_db()
     _load_data()
     logger.info(
         f"Data ready: {len(_biases)} biases, "
@@ -726,10 +784,15 @@ async def analyze_scene(
             url=local.get("url") if local else None,
         ))
 
+    scene = data.get("scene", "")
+    detected_dicts = [d.model_dump() for d in detected]
+    result_id = _save_result(scene, detected_dicts, backend_used)
+
     return AnalyzeResponse(
-        scene=data.get("scene", ""),
+        scene=scene,
         detected=detected,
         backend_used=backend_used,
+        result_id=result_id,
     )
 
 
@@ -765,6 +828,30 @@ async def validate_hf_token(body: TokenRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Could not reach Hugging Face: {e}")
+
+
+# ── Scan result endpoints ─────────────────────────────────────────────────────
+
+@app.get("/result/{result_id}", tags=["Scanner"])
+async def get_result_json(result_id: str):
+    """Return stored scan result as JSON (used by share page)."""
+    result = _get_result(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Result not found or expired (30-day TTL).")
+    return result
+
+
+@app.get("/r/{result_id}", include_in_schema=False)
+async def shareable_result_page(result_id: str):
+    """
+    Serve the shareable result page.
+    This is the human-readable permalink — e.g. /r/abc1234567.
+    The page JS fetches /result/{result_id} to load the data.
+    """
+    share_path = Path("static/share.html")
+    if not share_path.exists():
+        raise HTTPException(status_code=404, detail="Share page not found.")
+    return FileResponse(share_path)
 
 
 # ── Serve UI ──────────────────────────────────────────────────────────────────
