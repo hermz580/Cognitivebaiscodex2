@@ -143,6 +143,13 @@
 
     /* scrollable scan results */
     #scanResultsInner { max-height: 55vh; overflow-y: auto; }
+
+    /* input mode tabs */
+    .mode-tab { color: #94a3b8; }
+    .mode-tab.active { background: rgba(19,55,236,0.25); color: #fff; }
+
+    /* drag-over highlight */
+    #dropZone.drag-over { border-color: #1337ec; background: rgba(19,55,236,0.12); }
   </style>
 </head>
 
@@ -387,44 +394,99 @@
         </div>
       </div>
 
-      <!-- Camera -->
-      <div class="relative rounded-xl overflow-hidden bg-white/5 border border-white/10" style="height:252px;">
-        <video id="videoEl" autoplay playsinline muted></video>
-        <canvas id="canvasEl"></canvas>
-        <div id="camPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-600">
-          <span class="material-icons-round text-4xl">videocam_off</span>
-          <p class="text-xs text-center px-6 leading-relaxed">Point your camera at an ad, social media post, menu, or news headline</p>
-        </div>
-        <div id="scanOverlay" class="hidden absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
-          <div class="flex flex-col items-center gap-2">
-            <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent spinner"></div>
-            <span class="text-xs text-primary font-semibold">Analyzing…</span>
+      <!-- Input mode selector -->
+      <div class="flex gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
+        <button data-mode="camera" class="mode-tab active flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all">
+          <span class="material-icons-round text-sm">videocam</span> Camera
+        </button>
+        <button data-mode="url" class="mode-tab flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all">
+          <span class="material-icons-round text-sm">link</span> URL
+        </button>
+        <button data-mode="upload" class="mode-tab flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all">
+          <span class="material-icons-round text-sm">upload_file</span> Upload
+        </button>
+      </div>
+
+      <!-- ── Camera panel ── -->
+      <div id="cameraPanel">
+        <div class="relative rounded-xl overflow-hidden bg-white/5 border border-white/10" style="height:220px;">
+          <video id="videoEl" autoplay playsinline muted></video>
+          <canvas id="canvasEl"></canvas>
+          <div id="camPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-600">
+            <span class="material-icons-round text-4xl">videocam_off</span>
+            <p class="text-xs text-center px-6 leading-relaxed">Point your camera at an ad, social media post, menu, or news headline</p>
+          </div>
+          <div id="scanOverlay" class="hidden absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
+            <div class="flex flex-col items-center gap-2">
+              <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent spinner"></div>
+              <span class="text-xs text-primary font-semibold">Analyzing…</span>
+            </div>
           </div>
         </div>
+        <div class="flex gap-2 overflow-x-auto no-scroll mt-2">
+          <div class="tip-chip">📢 Ads</div>
+          <div class="tip-chip">📱 Social posts</div>
+          <div class="tip-chip">🛒 Packaging</div>
+          <div class="tip-chip">📰 Headlines</div>
+          <div class="tip-chip">🍽️ Menus</div>
+        </div>
+        <div class="flex gap-3 mt-3">
+          <button id="startCamBtn"
+            class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 flex items-center justify-center gap-2 transition-all active:scale-95">
+            <span class="material-icons-round text-base">videocam</span>
+            Start Camera
+          </button>
+          <button id="scanBtn" disabled
+            class="flex-1 py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
+            style="background:#1337ec; opacity:0.35;">
+            <span class="material-icons-round text-base">radar</span>
+            Scan
+          </button>
+        </div>
       </div>
 
-      <!-- Scan tips -->
-      <div class="flex gap-2 overflow-x-auto no-scroll">
-        <div class="tip-chip">📢 Ads</div>
-        <div class="tip-chip">📱 Social posts</div>
-        <div class="tip-chip">🛒 Product packaging</div>
-        <div class="tip-chip">📰 Headlines</div>
-        <div class="tip-chip">🍽️ Menus</div>
-        <div class="tip-chip">🏪 Storefronts</div>
-      </div>
-
-      <!-- Controls -->
-      <div class="flex gap-3">
-        <button id="startCamBtn"
-          class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 flex items-center justify-center gap-2 transition-all active:scale-95">
-          <span class="material-icons-round text-base">videocam</span>
-          Start Camera
+      <!-- ── URL panel ── -->
+      <div id="urlPanel" class="hidden space-y-3">
+        <p class="text-xs text-slate-400">Paste a public image URL — ad screenshot, social post, product photo, news image:</p>
+        <div class="flex gap-2">
+          <input id="urlInput" type="url" placeholder="https://example.com/image.jpg"
+            class="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary/50 transition-colors" />
+        </div>
+        <div id="urlPreviewWrap" class="hidden rounded-xl overflow-hidden bg-white/5 border border-white/10" style="height:180px;">
+          <img id="urlPreview" class="w-full h-full object-contain" alt="Preview" />
+        </div>
+        <button id="analyzeUrlBtn"
+          class="w-full py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
+          style="background:#1337ec">
+          <span class="material-icons-round text-base">radar</span>
+          Analyze URL
         </button>
-        <button id="scanBtn" disabled
-          class="flex-1 py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
+        <div id="urlAnalyzing" class="hidden flex items-center justify-center gap-2 py-3">
+          <div class="w-5 h-5 rounded-full border-2 border-primary border-t-transparent spinner"></div>
+          <span class="text-xs text-primary font-semibold">Fetching &amp; analyzing…</span>
+        </div>
+      </div>
+
+      <!-- ── Upload panel ── -->
+      <div id="uploadPanel" class="hidden space-y-3">
+        <div id="dropZone"
+          class="rounded-xl border-2 border-dashed border-white/20 bg-white/3 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary/40 hover:bg-white/5 transition-all"
+          style="height:200px;">
+          <span class="material-icons-round text-slate-500 text-4xl">cloud_upload</span>
+          <div class="text-center px-4">
+            <p class="text-sm font-semibold text-slate-300">Drop an image here</p>
+            <p class="text-xs text-slate-500 mt-1">or tap to browse — JPEG, PNG, WebP up to 4 MB</p>
+          </div>
+          <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" />
+        </div>
+        <div id="uploadPreviewWrap" class="hidden rounded-xl overflow-hidden bg-white/5 border border-white/10" style="height:180px;">
+          <img id="uploadPreview" class="w-full h-full object-contain" alt="Preview" />
+        </div>
+        <button id="analyzeUploadBtn" disabled
+          class="w-full py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
           style="background:#1337ec; opacity:0.35;">
           <span class="material-icons-round text-base">radar</span>
-          Scan
+          Analyze Image
         </button>
       </div>
 
@@ -942,6 +1004,143 @@ async function loadDailyPick() {
   document.getElementById("dailyPick").classList.remove("hidden");
   document.getElementById("dailyPickCard").addEventListener("click", () => openDetail(pick));
 }
+
+// ─── Input mode switcher ──────────────────────────────────────────────────────
+const PANELS = { camera: "cameraPanel", url: "urlPanel", upload: "uploadPanel" };
+let currentMode = "camera";
+
+document.querySelectorAll(".mode-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const mode = btn.dataset.mode;
+    if (mode === currentMode) return;
+    currentMode = mode;
+    document.querySelectorAll(".mode-tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    Object.values(PANELS).forEach(id => document.getElementById(id).classList.add("hidden"));
+    document.getElementById(PANELS[mode]).classList.remove("hidden");
+    // Clear results when switching modes
+    document.getElementById("scanResults").classList.add("hidden");
+    document.getElementById("scanError").classList.add("hidden");
+  });
+});
+
+// ─── URL mode ─────────────────────────────────────────────────────────────────
+const urlInput      = document.getElementById("urlInput");
+const urlPreview    = document.getElementById("urlPreview");
+const urlPreviewWrap= document.getElementById("urlPreviewWrap");
+const analyzeUrlBtn = document.getElementById("analyzeUrlBtn");
+const urlAnalyzing  = document.getElementById("urlAnalyzing");
+
+urlInput.addEventListener("input", () => {
+  const val = urlInput.value.trim();
+  if (val && (val.startsWith("http://") || val.startsWith("https://"))) {
+    urlPreview.src = val;
+    urlPreview.onerror = () => urlPreviewWrap.classList.add("hidden");
+    urlPreview.onload  = () => urlPreviewWrap.classList.remove("hidden");
+  } else {
+    urlPreviewWrap.classList.add("hidden");
+  }
+});
+
+analyzeUrlBtn.addEventListener("click", async () => {
+  const url = urlInput.value.trim();
+  if (!url) return;
+
+  analyzeUrlBtn.classList.add("hidden");
+  urlAnalyzing.classList.remove("hidden");
+  document.getElementById("scanResults").classList.add("hidden");
+  document.getElementById("scanError").classList.add("hidden");
+
+  try {
+    const headers = { "Content-Type": "application/json" };
+    const hfToken = getHFToken();
+    if (hfToken) headers["X-HF-Token"] = hfToken;
+
+    const res  = await fetch("/analyze-url", {
+      method: "POST", headers,
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+    renderResults(data);
+  } catch (e) {
+    showScanError(e.message || "Failed to analyze URL.");
+  } finally {
+    analyzeUrlBtn.classList.remove("hidden");
+    urlAnalyzing.classList.add("hidden");
+  }
+});
+
+// ─── Upload mode ───────────────────────────────────────────────────────────────
+const dropZone         = document.getElementById("dropZone");
+const fileInput        = document.getElementById("fileInput");
+const uploadPreview    = document.getElementById("uploadPreview");
+const uploadPreviewWrap= document.getElementById("uploadPreviewWrap");
+const analyzeUploadBtn = document.getElementById("analyzeUploadBtn");
+let uploadedB64 = null;
+let uploadedType = null;
+
+dropZone.addEventListener("click", () => fileInput.click());
+
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", e => {
+  e.preventDefault(); dropZone.classList.remove("drag-over");
+  const file = e.dataTransfer.files[0];
+  if (file) handleUploadFile(file);
+});
+
+fileInput.addEventListener("change", () => {
+  if (fileInput.files[0]) handleUploadFile(fileInput.files[0]);
+});
+
+function handleUploadFile(file) {
+  if (!file.type.startsWith("image/")) {
+    showScanError("Please select an image file (JPEG, PNG, WebP)."); return;
+  }
+  if (file.size > 4 * 1024 * 1024) {
+    showScanError("Image must be under 4 MB."); return;
+  }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const dataUrl = ev.target.result;
+    uploadedB64  = dataUrl.split(",")[1];
+    uploadedType = file.type || "image/jpeg";
+    uploadPreview.src = dataUrl;
+    uploadPreviewWrap.classList.remove("hidden");
+    analyzeUploadBtn.disabled = false;
+    analyzeUploadBtn.style.opacity = "1";
+    document.getElementById("scanResults").classList.add("hidden");
+    document.getElementById("scanError").classList.add("hidden");
+  };
+  reader.readAsDataURL(file);
+}
+
+analyzeUploadBtn.addEventListener("click", async () => {
+  if (!uploadedB64) return;
+  analyzeUploadBtn.disabled = true;
+  analyzeUploadBtn.innerHTML = `<span class="material-icons-round text-base spinner border-white">autorenew</span> Analyzing…`;
+
+  try {
+    const headers = { "Content-Type": "application/json" };
+    const hfToken = getHFToken();
+    if (hfToken) headers["X-HF-Token"] = hfToken;
+
+    const res  = await fetch("/analyze", {
+      method: "POST", headers,
+      body: JSON.stringify({ image: uploadedB64, media_type: uploadedType }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+    renderResults(data);
+  } catch (e) {
+    showScanError(e.message || "Analysis failed.");
+  } finally {
+    analyzeUploadBtn.disabled = false;
+    analyzeUploadBtn.innerHTML = `<span class="material-icons-round text-base">radar</span> Analyze Image`;
+    analyzeUploadBtn.style.opacity = "1";
+  }
+});
 
 // ─── Camera ───────────────────────────────────────────────────────────────────
 const video    = document.getElementById("videoEl");

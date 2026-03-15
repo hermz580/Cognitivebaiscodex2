@@ -2,6 +2,7 @@
 # ── main.py ────────────────────────
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -11,6 +12,7 @@ import sqlite3
 import time
 import uuid
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -99,6 +101,10 @@ class DetectedConcept(BaseModel):
 class AnalyzeRequest(BaseModel):
     image: str = Field(..., description="Base64-encoded image data (JPEG or PNG)")
     media_type: str = Field(default="image/jpeg")
+
+
+class AnalyzeUrlRequest(BaseModel):
+    url: str = Field(..., description="Public URL of an image to fetch and analyze")
 
 
 class AnalyzeResponse(BaseModel):
@@ -828,6 +834,123 @@ async def validate_hf_token(body: TokenRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Could not reach Hugging Face: {e}")
+
+
+# ── URL image fetch helper ────────────────────────────────────────────────────
+
+_ALLOWED_SCHEMES  = {"http", "https"}
+_BLOCKED_HOSTS    = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+_IMAGE_MIME_MAP   = {
+    "image/jpeg": "image/jpeg",
+    "image/jpg":  "image/jpeg",
+    "image/png":  "image/png",
+    "image/webp": "image/webp",
+    "image/gif":  "image/gif",
+}
+_URL_FETCH_MAX_BYTES = 4 * 1024 * 1024   # 4 MB
+
+
+async def _fetch_image_from_url(image_url: str) -> tuple[str, str]:
+    """
+    Fetch an image from a public URL.
+    Returns (base64_data, media_type) or raises HTTPException.
+    """
+    parsed = urlparse(image_url)
+    if parsed.scheme not in _ALLOWED_SCHEMES:
+        raise HTTPException(status_code=400, detail="Only http/https URLs are supported.")
+    if parsed.hostname in _BLOCKED_HOSTS:
+        raise HTTPException(status_code=400, detail="Private/local URLs are not allowed.")
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+            resp = await client.get(
+                image_url,
+                headers={"User-Agent": "CognitiveBiasCodex/2.0 (image scanner)"},
+            )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timed out fetching the image URL.")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not fetch URL: {e}")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=400, detail=f"URL returned HTTP {resp.status_code}.")
+
+    content_type = resp.headers.get("content-type", "").split(";")[0].strip().lower()
+    media_type   = _IMAGE_MIME_MAP.get(content_type)
+    if not media_type:
+        # Guess from URL extension as fallback
+        ext = parsed.path.lower().rsplit(".", 1)[-1]
+        media_type = _IMAGE_MIME_MAP.get(f"image/{ext}")
+    if not media_type:
+        raise HTTPException(
+            status_code=415,
+            detail=f"URL does not point to a supported image (got '{content_type}').",
+        )
+
+    raw = resp.content
+    if len(raw) > _URL_FETCH_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Image at URL exceeds 4 MB limit.")
+
+    return base64.b64encode(raw).decode(), media_type
+
+
+@app.post("/analyze-url", response_model=AnalyzeResponse, tags=["Scanner"])
+async def analyze_url(
+    req: AnalyzeUrlRequest,
+    x_hf_token: Optional[str] = Header(None),
+):
+    """
+    Fetch an image from a public URL and analyze it for cognitive biases.
+    Uses the same AI backend pipeline as /analyze.
+    """
+    image_b64, media_type = await _fetch_image_from_url(req.url)
+
+    # Reuse the exact same pipeline as /analyze
+    backend_used = "none"
+    data: Optional[dict] = None
+
+    data = await _try_anthropic(image_b64, media_type)
+    if data:
+        backend_used = "anthropic"
+
+    if data is None:
+        data = await _try_huggingface(override_token=x_hf_token, image_b64=image_b64)
+        if data:
+            backend_used = "huggingface"
+
+    if data is None:
+        data = await _try_local_llm()
+        if data:
+            backend_used = "local_llm"
+
+    if data is None:
+        raise HTTPException(status_code=503, detail="No AI backend available.")
+
+    detected: List[DetectedConcept] = []
+    for item in data.get("biases", [])[:5]:
+        name = item.get("name", "").strip()
+        if not name:
+            continue
+        local = _match_concept(name)
+        detected.append(DetectedConcept(
+            name=name,
+            reason=item.get("reason", ""),
+            confidence=item.get("confidence", "medium"),
+            type=local.get("type", "bias") if local else "bias",
+            category=local.get("category") if local else None,
+            subcategory=local.get("subcategory") if local else None,
+            url=local.get("url") if local else None,
+        ))
+
+    scene = data.get("scene", "")
+    result_id = _save_result(scene, [d.model_dump() for d in detected], backend_used)
+
+    return AnalyzeResponse(
+        scene=scene,
+        detected=detected,
+        backend_used=backend_used,
+        result_id=result_id,
+    )
 
 
 # ── Scan result endpoints ─────────────────────────────────────────────────────

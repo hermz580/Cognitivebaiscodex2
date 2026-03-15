@@ -192,3 +192,67 @@ async def test_analyze_no_backend_503(client):
         dummy = base64.b64encode(b"\xff\xd8\xff" + b"\x00" * 100).decode()
         r = await client.post("/analyze", json={"image": dummy, "media_type": "image/jpeg"})
         assert r.status_code == 503
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# /analyze-url
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def test_analyze_url_rejects_non_http(client):
+    r = await client.post("/analyze-url", json={"url": "ftp://example.com/img.jpg"})
+    assert r.status_code == 400
+
+async def test_analyze_url_rejects_localhost(client):
+    r = await client.post("/analyze-url", json={"url": "http://localhost/img.jpg"})
+    assert r.status_code == 400
+
+async def test_analyze_url_rejects_127(client):
+    r = await client.post("/analyze-url", json={"url": "http://127.0.0.1/img.jpg"})
+    assert r.status_code == 400
+
+async def test_analyze_url_fetch_error_502(client):
+    """Network failure while fetching URL → 502."""
+    import httpx as _httpx
+    with patch("main.httpx.AsyncClient") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.get.side_effect = Exception("connection refused")
+        r = await client.post("/analyze-url", json={"url": "https://example.com/image.jpg"})
+    assert r.status_code == 502
+
+async def test_analyze_url_non_image_content_type(client):
+    """URL pointing at HTML → 415."""
+    import httpx as _httpx
+    mock_resp = AsyncMock()
+    mock_resp.status_code = 200
+    mock_resp.headers = {"content-type": "text/html"}
+    mock_resp.content = b"<html></html>"
+    with patch("main.httpx.AsyncClient") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.get = AsyncMock(return_value=mock_resp)
+        r = await client.post("/analyze-url", json={"url": "https://example.com/page.html"})
+    assert r.status_code == 415
+
+async def test_analyze_url_success(client):
+    """Happy path: valid JPEG URL → 200 with result_id."""
+    jpeg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 200
+    mock_resp = AsyncMock()
+    mock_resp.status_code = 200
+    mock_resp.headers = {"content-type": "image/jpeg"}
+    mock_resp.content = jpeg_bytes
+    fake_result = {
+        "scene": "A test scene.",
+        "biases": [{"name": "Anchoring", "reason": "price tag", "confidence": "high"}],
+    }
+    with (
+        patch("main.httpx.AsyncClient") as MockClient,
+        patch.object(app_module, "_try_anthropic", new=AsyncMock(return_value=fake_result)),
+        patch.object(app_module, "_save_result", return_value="test1234ab"),
+    ):
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.get = AsyncMock(return_value=mock_resp)
+        r = await client.post("/analyze-url", json={"url": "https://example.com/ad.jpg"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["scene"] == "A test scene."
+    assert body["result_id"] == "test1234ab"
+    assert len(body["detected"]) == 1
