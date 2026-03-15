@@ -25,6 +25,7 @@ app_module._biases = [
 ]
 app_module._fallacies = []
 app_module._mental_models = []
+app_module._init_db()   # create tables needed by rate-limiting and result storage
 
 
 # ── Async HTTP client fixture ─────────────────────────────────────────────────
@@ -185,6 +186,7 @@ async def test_analyze_bad_media_type(client):
 async def test_analyze_no_backend_503(client):
     """All backends unavailable → 503."""
     with (
+        patch.object(app_module, "_check_and_increment_rate", return_value=(1, 20)),
         patch.object(app_module, "_try_anthropic", new=AsyncMock(return_value=None)),
         patch.object(app_module, "_try_huggingface", new=AsyncMock(return_value=None)),
         patch.object(app_module, "_try_local_llm", new=AsyncMock(return_value=None)),
@@ -212,8 +214,10 @@ async def test_analyze_url_rejects_127(client):
 
 async def test_analyze_url_fetch_error_502(client):
     """Network failure while fetching URL → 502."""
-    import httpx as _httpx
-    with patch("main.httpx.AsyncClient") as MockClient:
+    with (
+        patch.object(app_module, "_check_and_increment_rate", return_value=(1, 20)),
+        patch("main.httpx.AsyncClient") as MockClient,
+    ):
         instance = MockClient.return_value.__aenter__.return_value
         instance.get.side_effect = Exception("connection refused")
         r = await client.post("/analyze-url", json={"url": "https://example.com/image.jpg"})
@@ -221,12 +225,14 @@ async def test_analyze_url_fetch_error_502(client):
 
 async def test_analyze_url_non_image_content_type(client):
     """URL pointing at HTML → 415."""
-    import httpx as _httpx
     mock_resp = AsyncMock()
     mock_resp.status_code = 200
     mock_resp.headers = {"content-type": "text/html"}
     mock_resp.content = b"<html></html>"
-    with patch("main.httpx.AsyncClient") as MockClient:
+    with (
+        patch.object(app_module, "_check_and_increment_rate", return_value=(1, 20)),
+        patch("main.httpx.AsyncClient") as MockClient,
+    ):
         instance = MockClient.return_value.__aenter__.return_value
         instance.get = AsyncMock(return_value=mock_resp)
         r = await client.post("/analyze-url", json={"url": "https://example.com/page.html"})
@@ -244,6 +250,7 @@ async def test_analyze_url_success(client):
         "biases": [{"name": "Anchoring", "reason": "price tag", "confidence": "high"}],
     }
     with (
+        patch.object(app_module, "_check_and_increment_rate", return_value=(1, 20)),
         patch("main.httpx.AsyncClient") as MockClient,
         patch.object(app_module, "_try_anthropic", new=AsyncMock(return_value=fake_result)),
         patch.object(app_module, "_save_result", return_value="test1234ab"),

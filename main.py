@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -120,8 +120,11 @@ _DB_PATH = Path("scan_results.db")
 _RESULT_TTL_DAYS = 30
 
 
+FREE_SCANS_PER_DAY = int(os.getenv("FREE_SCANS_PER_DAY", "20"))
+
+
 def _init_db() -> None:
-    """Create the results table and prune old entries."""
+    """Create all tables and prune expired rows."""
     conn = sqlite3.connect(_DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS scan_results (
@@ -132,10 +135,56 @@ def _init_db() -> None:
             backend_used TEXT
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS rate_limits (
+            ip   TEXT    NOT NULL,
+            date TEXT    NOT NULL,
+            cnt  INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (ip, date)
+        )
+    """)
     cutoff = int(time.time()) - _RESULT_TTL_DAYS * 86400
     conn.execute("DELETE FROM scan_results WHERE ts < ?", (cutoff,))
+    # Keep only today's and yesterday's rate-limit rows
+    conn.execute("DELETE FROM rate_limits WHERE date < date('now', '-1 day')")
     conn.commit()
     conn.close()
+
+
+def _check_and_increment_rate(ip: str) -> tuple[int, int]:
+    """
+    Atomically increment today's scan count for this IP.
+    Returns (count_after_increment, daily_limit).
+    Raises HTTPException 429 when the free limit is exceeded.
+    """
+    today = time.strftime("%Y-%m-%d")
+    conn  = sqlite3.connect(_DB_PATH)
+    conn.execute(
+        "INSERT INTO rate_limits (ip, date, cnt) VALUES (?, ?, 1) "
+        "ON CONFLICT(ip, date) DO UPDATE SET cnt = cnt + 1",
+        (ip, today),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT cnt FROM rate_limits WHERE ip = ? AND date = ?", (ip, today)
+    ).fetchone()
+    conn.close()
+    count = row[0] if row else 1
+    if count > FREE_SCANS_PER_DAY:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "rate_limit_exceeded",
+                "scans_today": count - 1,
+                "limit": FREE_SCANS_PER_DAY,
+                "upgrade_url": "/pro",
+                "message": (
+                    f"Free tier: {FREE_SCANS_PER_DAY} scans/day. "
+                    "Upgrade to Pro for unlimited scans."
+                ),
+            },
+        )
+    return count, FREE_SCANS_PER_DAY
 
 
 def _save_result(scene: str, detected: list, backend_used: str) -> str:
@@ -724,7 +773,9 @@ def health_check():
 @app.post("/analyze", response_model=AnalyzeResponse, tags=["Scanner"])
 async def analyze_scene(
     req: AnalyzeRequest,
+    request: Request,
     x_hf_token: Optional[str] = Header(None, description="Per-request Hugging Face token (overrides server HF_TOKEN)"),
+    x_api_key: Optional[str] = Header(None, description="Pro API key — bypasses rate limiting"),
 ):
     """
     Analyze a base64-encoded camera frame for cognitive biases.
@@ -734,6 +785,10 @@ async def analyze_scene(
     2. Hugging Face Inference API (cloud text — if HF_TOKEN set server-side OR X-HF-Token header provided)
     3. Local LLM at localhost:1234 (text-only fallback, no image analysis)
     """
+    if not x_api_key:
+        client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
+        _check_and_increment_rate(client_ip)
+
     if req.media_type not in _ALLOWED_MEDIA:
         raise HTTPException(
             status_code=400,
@@ -897,12 +952,18 @@ async def _fetch_image_from_url(image_url: str) -> tuple[str, str]:
 @app.post("/analyze-url", response_model=AnalyzeResponse, tags=["Scanner"])
 async def analyze_url(
     req: AnalyzeUrlRequest,
+    request: Request,
     x_hf_token: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, description="Pro API key — bypasses rate limiting"),
 ):
     """
     Fetch an image from a public URL and analyze it for cognitive biases.
     Uses the same AI backend pipeline as /analyze.
     """
+    if not x_api_key:
+        client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
+        _check_and_increment_rate(client_ip)
+
     image_b64, media_type = await _fetch_image_from_url(req.url)
 
     # Reuse the exact same pipeline as /analyze
@@ -962,6 +1023,14 @@ async def get_result_json(result_id: str):
     if not result:
         raise HTTPException(status_code=404, detail="Result not found or expired (30-day TTL).")
     return result
+
+
+@app.get("/pro", include_in_schema=False)
+async def pro_page():
+    path = Path("static/pro.html")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Pro page not found.")
+    return FileResponse(path)
 
 
 @app.get("/r/{result_id}", include_in_schema=False)

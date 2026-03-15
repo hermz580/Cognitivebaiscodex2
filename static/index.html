@@ -291,6 +291,11 @@
         Learn more
       </a>
     </div>
+    <!-- Affiliate book recommendations -->
+    <div id="detailBooks" class="hidden border-t border-white/8 pt-4">
+      <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5">📚 Recommended reading</p>
+      <div id="detailBookList" class="space-y-2"></div>
+    </div>
   </div>
 </div>
 
@@ -582,6 +587,21 @@
             Set up by whoever runs this instance; no action needed from you.
           </p>
         </div>
+      </div>
+
+      <!-- Upgrade section -->
+      <div class="space-y-2">
+        <p class="text-[10px] font-bold tracking-widest uppercase text-slate-500 px-1">Upgrade</p>
+        <a href="/pro" class="glass-card rounded-xl p-4 flex items-center gap-3 hover:border-primary/40 transition-colors border border-white/5 no-underline group">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#1337ec22">
+            <span class="material-icons-round text-base" style="color:#1337ec">bolt</span>
+          </div>
+          <div class="flex-1">
+            <p class="text-sm font-bold text-white group-hover:text-primary transition-colors">Pro — $8/month</p>
+            <p class="text-xs text-slate-500">Unlimited scans · API access · Priority AI</p>
+          </div>
+          <span class="material-icons-round text-slate-600 group-hover:text-primary transition-colors text-sm">chevron_right</span>
+        </a>
       </div>
 
       <!-- About section -->
@@ -934,6 +954,58 @@ function conceptCard(c) {
 }
 
 // ─── Concept detail modal ─────────────────────────────────────────────────────
+// ─── Affiliate book data ──────────────────────────────────────────────────────
+// Replace YOUR_TAG with your Amazon Associates tag (e.g. mysite-20)
+const AFFILIATE_TAG = "YOUR_TAG-20";
+function amzn(asin, title, author) {
+  return { title, author, url: `https://www.amazon.com/dp/${asin}?tag=${AFFILIATE_TAG}` };
+}
+
+// Books keyed by concept type and category keywords
+const BOOKS_BY_TOPIC = {
+  // Universal fallback — great for any bias/fallacy
+  _default: [
+    amzn("0374533555", "Thinking, Fast and Slow", "Daniel Kahneman"),
+    amzn("0062219774", "The Art of Thinking Clearly", "Rolf Dobelli"),
+    amzn("006135022X", "Influence: The Psychology of Persuasion", "Robert Cialdini"),
+  ],
+  memory: [
+    amzn("0674057589", "The Seven Sins of Memory", "Daniel Schacter"),
+    amzn("0374533555", "Thinking, Fast and Slow", "Daniel Kahneman"),
+    amzn("0143127527", "Predictably Irrational", "Dan Ariely"),
+  ],
+  social: [
+    amzn("006135022X", "Influence: The Psychology of Persuasion", "Robert Cialdini"),
+    amzn("1501124021", "Pre-Suasion", "Robert Cialdini"),
+    amzn("0374533555", "Thinking, Fast and Slow", "Daniel Kahneman"),
+  ],
+  decision: [
+    amzn("0374533555", "Thinking, Fast and Slow", "Daniel Kahneman"),
+    amzn("0143127527", "Predictably Irrational", "Dan Ariely"),
+    amzn("1594484805", "Nudge", "Thaler & Sunstein"),
+  ],
+  fallacy: [
+    amzn("0393310485", "Being Wrong", "Kathryn Schulz"),
+    amzn("0465005608", "The Demon-Haunted World", "Carl Sagan"),
+    amzn("0062219774", "The Art of Thinking Clearly", "Rolf Dobelli"),
+  ],
+  mental_model: [
+    amzn("0525537333", "The Great Mental Models Vol. 1", "Shane Parrish"),
+    amzn("1250219086", "The Great Mental Models Vol. 2", "Shane Parrish"),
+    amzn("0374533555", "Thinking, Fast and Slow", "Daniel Kahneman"),
+  ],
+};
+
+function getBooksFor(c) {
+  if (c.type === "mental_model") return BOOKS_BY_TOPIC.mental_model;
+  if (c.type === "fallacy")      return BOOKS_BY_TOPIC.fallacy;
+  const cat = (c.category || "").toLowerCase();
+  if (cat.includes("memory") || cat.includes("recall")) return BOOKS_BY_TOPIC.memory;
+  if (cat.includes("social") || cat.includes("group") || cat.includes("attribution")) return BOOKS_BY_TOPIC.social;
+  if (cat.includes("decision") || cat.includes("choice") || cat.includes("risk")) return BOOKS_BY_TOPIC.decision;
+  return BOOKS_BY_TOPIC._default;
+}
+
 function openDetail(c) {
   const modal   = document.getElementById("detailModal");
   const pills   = document.getElementById("detailPills");
@@ -956,6 +1028,22 @@ function openDetail(c) {
   } else {
     linkWrap.classList.add("hidden");
   }
+
+  // Book recommendations
+  const books     = getBooksFor(c);
+  const bookWrap  = document.getElementById("detailBooks");
+  const bookList  = document.getElementById("detailBookList");
+  bookList.innerHTML = books.slice(0, 3).map(b => `
+    <a href="${b.url}" target="_blank" rel="noopener sponsored"
+      class="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/8 border border-white/8 hover:border-primary/30 transition-all no-underline group">
+      <span class="material-icons-round text-amber-400 text-base flex-shrink-0">menu_book</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-semibold text-white group-hover:text-primary transition-colors truncate">${b.title}</p>
+        <p class="text-[10px] text-slate-500">${b.author}</p>
+      </div>
+      <span class="material-icons-round text-slate-600 text-sm group-hover:text-primary transition-colors">open_in_new</span>
+    </a>`).join("");
+  bookWrap.classList.remove("hidden");
 
   modal.classList.add("open");
 
@@ -1060,9 +1148,8 @@ analyzeUrlBtn.addEventListener("click", async () => {
       method: "POST", headers,
       body: JSON.stringify({ url }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
-    renderResults(data);
+    const data = await handleScanResponse(res);
+    if (data) renderResults(data);
   } catch (e) {
     showScanError(e.message || "Failed to analyze URL.");
   } finally {
@@ -1130,9 +1217,8 @@ analyzeUploadBtn.addEventListener("click", async () => {
       method: "POST", headers,
       body: JSON.stringify({ image: uploadedB64, media_type: uploadedType }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
-    renderResults(data);
+    const data = await handleScanResponse(res);
+    if (data) renderResults(data);
   } catch (e) {
     showScanError(e.message || "Analysis failed.");
   } finally {
@@ -1191,9 +1277,8 @@ scanBtn.addEventListener("click", async () => {
       method: "POST", headers,
       body: JSON.stringify({ image: b64, media_type: "image/jpeg" }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "Analysis failed.");
-    renderResults(data);
+    const data = await handleScanResponse(res);
+    if (data) renderResults(data);
   } catch (e) { showScanError(e.message); }
   finally {
     document.getElementById("scanOverlay").classList.add("hidden");
@@ -1264,9 +1349,43 @@ function renderResults(data) {
   }
 }
 
-function showScanError(msg) {
-  document.getElementById("scanErrorText").textContent = msg;
-  document.getElementById("scanError").classList.remove("hidden");
+function showScanError(msg, isRateLimit = false) {
+  const el   = document.getElementById("scanError");
+  const text = document.getElementById("scanErrorText");
+  if (isRateLimit) {
+    el.innerHTML = `
+      <div class="flex flex-col gap-3">
+        <div class="flex items-start gap-2">
+          <span class="material-icons-round text-amber-400 text-base flex-shrink-0 mt-0.5">bolt</span>
+          <div>
+            <p class="text-sm font-bold text-white">Daily limit reached</p>
+            <p class="text-xs text-slate-400 mt-0.5 leading-relaxed">Free tier: 20 scans/day. Upgrade to Pro for unlimited scans and API access.</p>
+          </div>
+        </div>
+        <a href="/pro" class="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95" style="background:#1337ec">
+          <span class="material-icons-round text-sm">upgrade</span>
+          Upgrade to Pro — $8/month
+        </a>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <div class="flex items-start gap-2">
+        <span class="material-icons-round text-rose-400 text-base flex-shrink-0 mt-0.5">error_outline</span>
+        <p id="scanErrorText" class="text-sm text-rose-400 leading-relaxed">${msg}</p>
+      </div>`;
+  }
+  el.classList.remove("hidden");
+}
+
+// Central error handler — detects 429 rate limit responses
+async function handleScanResponse(res) {
+  const data = await res.json();
+  if (res.status === 429) {
+    showScanError("", true);
+    return null;
+  }
+  if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+  return data;
 }
 
 // ─── Scan History (localStorage) ──────────────────────────────────────────────
