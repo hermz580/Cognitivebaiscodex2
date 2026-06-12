@@ -1,46 +1,84 @@
-from main import load_data, list_biases, get_bias_details, get_bias_context, list_fallacies, get_fallacy_details, list_mental_models, get_mental_model_details, get_concept_details
+"""
+test_mcp.py — Unified Server Test Harness
+Tests: Biases, Fallacies, Mental Models, Caching, Unified Search
+"""
 import asyncio
 import time
+from main import (
+    load_biases,
+    load_fallacies,
+    load_models,
+    get_bias_details,
+    get_fallacy_details,
+    get_mental_model_details,
+    get_concept_details,
+    fetch_wikipedia,
+    search_biases,
+    search_fallacies,
+)
+
 
 async def test_all():
-    print("--- TESTING BIASES ---")
-    data = load_data()
-    print(f"Loaded {len(data)} biases.")
-    print(get_bias_details('Confirmation bias'))
+    print("\n" + "=" * 60)
+    print("  COGNITIVE BIAS CODEX — UNIFIED SERVER TEST HARNESS")
+    print("=" * 60)
 
-    print("\n--- TESTING FALLACIES ---")
-    fallacies = list_fallacies()
-    print(f"Loaded {len(fallacies)} fallacies.")
-    print(get_fallacy_details('Ad Hominem Abusive'))
+    # ── Biases ──
+    print("\n--- BIASES ---")
+    biases = load_biases()
+    leaf_biases = [b for b in biases if b["is_leaf"]]
+    print(f"Total entries : {len(biases)}")
+    print(f"Leaf biases   : {len(leaf_biases)}")
+    detail = get_bias_details("Confirmation bias")
+    print(f"Detail lookup : {detail[:80]}...")
+    results = search_biases("memory")
+    print(f"Search 'memory': {len(results)} results")
 
-    print("\n--- TESTING MENTAL MODELS ---")
-    models = list_mental_models()
-    print(f"Loaded {len(models)} mental models.")
-    print(f"Models: {models[:5]}")
-    print(get_mental_model_details('First Principles'))
+    # ── Fallacies ──
+    print("\n--- FALLACIES ---")
+    fallacies = load_fallacies()
+    print(f"Total fallacies : {len(fallacies)}")
+    fallacy = get_fallacy_details("Ad Hominem Abusive")
+    print(f"Detail lookup   : {fallacy[:80]}...")
+    results = search_fallacies("appeal")
+    print(f"Search 'appeal' : {len(results)} results")
 
-    print("\n--- TESTING CACHING (Wikipedia) ---")
-    start_time = time.time()
-    await get_bias_context('Confirmation bias')
-    print(f"First Call Duration: {time.time() - start_time:.4f}s")
-    
-    start_time = time.time()
-    res = await get_bias_context('Confirmation bias')
-    print(f"Second Call Duration: {time.time() - start_time:.4f}s")
-    if "[CACHED]" in res:
-        print("Cache HIT verified.")
-    else:
-        print("Cache MISS (Error?)")
+    # ── Mental Models ──
+    print("\n--- MENTAL MODELS ---")
+    models = load_models()
+    print(f"Total models : {len(models)}")
+    model = get_mental_model_details("First Principles")
+    print(f"Detail lookup: {model[:80]}...")
 
-    print("\n--- TESTING UNIFIED CONCEPT SEARCH ---")
-    print("Searching for 'Confirmation bias' (expecting Bias):")
-    print(get_concept_details('Confirmation bias')[:100] + "...")
-    
-    print("\nSearching for 'Ad Hominem Abusive' (expecting Fallacy):")
-    print(get_concept_details('Ad Hominem Abusive')[:100] + "...")
-    
-    print("\nSearching for 'First Principles' (expecting Mental Model):")
-    print(get_concept_details('First Principles')[:100] + "...")
+    # ── Wikipedia + Cache ──
+    print("\n--- WIKIPEDIA ENRICHMENT + CACHE ---")
+    t0 = time.time()
+    result1 = await fetch_wikipedia("https://en.wikipedia.org/wiki/Confirmation_bias")
+    elapsed1 = time.time() - t0
+    print(f"First  fetch : {elapsed1:.3f}s | {str(result1)[:60]}...")
+
+    t0 = time.time()
+    result2 = await fetch_wikipedia("https://en.wikipedia.org/wiki/Confirmation_bias")
+    elapsed2 = time.time() - t0
+    print(f"Second fetch : {elapsed2:.3f}s | {'[CACHED]' if result2 and result2.startswith('[CACHED]') else 'NOT CACHED'}")
+    assert elapsed2 < elapsed1, "Cache should make second call faster"
+    print("Cache test   : PASSED")
+
+    # ── Unified Search ──
+    print("\n--- UNIFIED CONCEPT SEARCH ---")
+    for term, expected_type in [
+        ("Confirmation bias",   "Cognitive Bias"),
+        ("Ad Hominem Abusive",  "Logical Fallacy"),
+        ("First Principles",    "Mental Model"),
+    ]:
+        result = get_concept_details(term)
+        status = "PASS" if expected_type in result else "FAIL"
+        print(f"[{status}] '{term}' -> {result[:50]}...")
+
+    print("\n" + "=" * 60)
+    print("  ALL TESTS COMPLETE")
+    print("=" * 60 + "\n")
+
 
 if __name__ == "__main__":
     asyncio.run(test_all())

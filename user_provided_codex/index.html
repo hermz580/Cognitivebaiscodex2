@@ -1,345 +1,452 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html class="dark" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cognitive Codex Mobile</title>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Cognitive Bias Codex — Nano Banana UI</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+    
+    <!-- Tailwind via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Tailwind Config -->
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#8b5cf6",       /* V2 inspired purple */
+                        "secondary": "#3b82f6",     /* Sci-Fi blue */
+                        "accent": "#10b981",        /* Success/Tech emerald */
+                        "background-dark": "#0a0a0b", /* User preferred absolute dark */
+                        "surface-glass": "rgba(23, 27, 47, 0.4)",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    backdropBlur: {
+                        'xs': '2px',
+                        'md': '12px',
+                    }
+                },
+            },
+        }
+    </script>
+    
+    <!-- Custom Styles -->
     <style>
-        :root {
-            --bg-color: #0a0a0b;
-            --text-color: #d4d4d8;
-            --card-bg: #18181b;
-            --accent-color: #8b5cf6;
-            --secondary-color: #52525b;
-            --border-radius: 12px;
-            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        /* Hide scrollbar but keep functionality */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Glassmorphism Classes (V3 style) */
+        .glass-panel {
+            background: rgba(10, 10, 11, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .glass-card {
+            background: linear-gradient(145deg, rgba(30,30,40, 0.6) 0%, rgba(15,15,20, 0.9) 100%);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-user-select: none;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
+        .glass-card:hover {
+            border-color: rgba(139, 92, 246, 0.4); /* Primary glow */
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px 0 rgba(139, 92, 246, 0.15);
+        }
+        
+        .glass-card.expanded {
+            border-color: rgba(139, 92, 246, 0.7);
         }
 
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: var(--font-family);
-            font-size: 16px;
-            line-height: 1.5;
-            padding: 20px;
-            padding-bottom: 80px;
-            /* Space for navbar */
+        /* Neon glow utilities */
+        .neon-text { text-shadow: 0 0 12px rgba(139, 92, 246, 0.6); }
+
+        /* Gradient Animation for the Daily Pick (V2 style) */
+        .animate-gradient {
+            background-size: 200% 200%;
+            animation: gradientMove 8s ease infinite;
+        }
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
 
-        h1 {
-            font-size: 1.5rem;
-            margin-bottom: 20px;
-            color: #fff;
-            text-align: center;
+        /* Expanded Details animation */
+        .details-wrapper {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out, opacity 0.3s ease-out;
+            opacity: 0;
         }
-
-        /* Search Bar */
-        .search-container {
-            position: sticky;
-            top: 20px;
-            z-index: 100;
-            margin-bottom: 20px;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 12px 16px;
-            border-radius: 25px;
-            /* Pill shape */
-            border: none;
-            background-color: #27272a;
-            color: #fff;
-            font-size: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            outline: none;
-        }
-
-        input[type="text"]::placeholder {
-            color: #a1a1aa;
-        }
-
-        /* Tabs/Categories */
-        .tabs {
-            display: flex;
-            overflow-x: auto;
-            gap: 10px;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
-            scrollbar-width: none;
-            /* Hide scrollbar Firefox */
-        }
-
-        .tabs::-webkit-scrollbar {
-            display: none;
-            /* Hide scrollbar Chrome/Safari */
-        }
-
-        .tab {
-            padding: 8px 16px;
-            background-color: #27272a;
-            border-radius: 20px;
-            white-space: nowrap;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            font-size: 0.9rem;
-        }
-
-        .tab.active {
-            background-color: var(--accent-color);
-            color: #fff;
-        }
-
-        /* List Layout */
-        .item-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        /* Card Style */
-        .card {
-            background-color: var(--card-bg);
-            border-radius: var(--border-radius);
-            padding: 16px;
-            cursor: pointer;
-            transition: transform 0.1s;
-            border: 1px solid #27272a;
-        }
-
-        .card:active {
-            transform: scale(0.98);
-        }
-
-        .card-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-            margin-bottom: 4px;
-            color: #fff;
-        }
-
-        .card-subtitle {
-            font-size: 0.85rem;
-            color: #a1a1aa;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .card-details {
-            display: none;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #3f3f46;
-            font-size: 0.95rem;
-            color: #d4d4d8;
-        }
-
-        .card.expanded .card-details {
-            display: block;
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-5px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .detail-row {
-            margin-bottom: 8px;
-        }
-
-        .detail-label {
-            font-weight: bold;
-            color: var(--accent-color);
-        }
-
-        /* Bottom Nav (Optional for future features) */
-        .bottom-nav {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #27272a;
-            padding: 10px 20px;
-            border-radius: 30px;
-            display: flex;
-            gap: 20px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-            -webkit-backdrop-filter: blur(10px);
-            backdrop-filter: blur(10px);
-            z-index: 1000;
-        }
-
-        .nav-item {
-            color: #a1a1aa;
-            font-size: 1.5rem;
-            /* Emoji icons */
-            cursor: pointer;
-        }
-
-        .nav-item.active {
-            color: var(--accent-color);
+        
+        .expanded .details-wrapper {
+            max-height: 1000px;
+            opacity: 1;
         }
     </style>
 </head>
 
-<body>
+<body class="bg-background-dark text-slate-200 font-display antialiased leading-relaxed min-h-screen relative selection:bg-primary selection:text-white">
+    <!-- Ambient Sci-Fi Background Glows -->
+    <div class="fixed top-[-15%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/20 blur-[120px] pointer-events-none z-0"></div>
+    <div class="fixed bottom-[-10%] right-[-10%] w-[60%] h-[50%] rounded-full bg-secondary/10 blur-[100px] pointer-events-none z-0"></div>
 
-    <h1>Cognitive Codex</h1>
+    <!-- Main Container -->
+    <div class="max-w-2xl mx-auto min-h-screen relative flex flex-col pb-24 border-x border-white/5 bg-background-dark/40 shadow-2xl">
+        
+        <!-- Sticky Glass Header (V1 + V3) -->
+        <header class="sticky top-0 z-50 glass-panel px-6 pt-10 pb-5">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h1 class="text-[10px] font-bold tracking-widest uppercase text-primary mb-1 neon-text flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                        Codex V.2.0.4
+                    </h1>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Cognitive Library</h2>
+                </div>
+                <!-- HUD Stats (V3) -->
+                <div class="text-right glass-card px-3 py-1.5 rounded-lg border-white/5 bg-black/50">
+                    <div class="text-[9px] uppercase tracking-widest text-slate-500 font-semibold mb-0.5">Core Matrix</div>
+                    <div class="text-white font-bold text-sm tracking-wide" id="hudStat">Loading...</div>
+                </div>
+            </div>
 
-    <div class="search-container">
-        <input type="text" id="searchInput" placeholder="Search Biases, Fallacies...">
+            <!-- Unified Search Bar -->
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span class="material-icons-round text-primary group-focus-within:text-white transition-colors text-lg">search</span>
+                </div>
+                <input id="searchInput" class="block w-full pl-12 pr-12 py-3.5 border border-white/10 rounded-xl leading-5 bg-black/40 text-white placeholder-slate-500 focus:outline-none focus:border-primary/50 focus:bg-black/60 focus:ring-1 focus:ring-primary/50 transition-all shadow-inner text-sm" placeholder="Search biases, fallacies, models..." type="text" />
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <kbd class="hidden sm:flex items-center justify-center border border-slate-700/80 rounded bg-slate-800/50 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">⌘K</kbd>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 px-5 pt-4 relative z-10 space-y-8 overflow-y-auto no-scrollbar">
+            
+            <!-- Pick of the Day Card (Mobile App V2 styling) -->
+            <section id="dailyPickSection">
+                <div class="flex justify-between items-end mb-3">
+                    <h2 class="text-sm font-semibold text-slate-300">Daily Discovery</h2>
+                    <span class="text-[9px] font-bold uppercase tracking-widest text-primary/80">Highlight</span>
+                </div>
+                <div class="relative w-full rounded-2xl overflow-hidden group shadow-lg shadow-primary/10 border border-white/5">
+                    <!-- Vibrant Animated Gradient -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-primary via-[#4f46e5] to-secondary opacity-90 animate-gradient"></div>
+                    <!-- Abstract Pattern -->
+                    <div class="absolute inset-0 opacity-[0.15]" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 24px 24px;"></div>
+                    
+                    <div class="relative p-7 flex flex-col justify-between min-h-[200px]">
+                        <div class="flex justify-between items-start">
+                            <span class="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest text-white border border-white/10">
+                                Mental Model
+                            </span>
+                            <span class="material-icons-round text-white/50 cursor-pointer hover:text-white transition-colors">bookmark_border</span>
+                        </div>
+                        <div class="mt-8">
+                            <h3 class="text-3xl font-bold text-white mb-2 leading-tight drop-shadow-md">First Principles</h3>
+                            <p class="text-white/80 text-sm font-medium leading-relaxed mb-4 max-w-[90%] drop-shadow-sm">
+                                Breaking down a complex problem into its most basic, foundational truths and reasoning up from there.
+                            </p>
+                            <div class="flex items-center gap-2 text-white font-medium text-xs uppercase tracking-wide cursor-pointer group-hover:text-amber-300 transition-colors">
+                                <span>Analyze Pattern</span>
+                                <span class="material-icons-round text-sm group-hover:scale-125 transition-transform">arrow_forward</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Category Filter Scroll (V1 SaaS style) -->
+            <section class="mb-4">
+                <div class="flex space-x-2 overflow-x-auto no-scrollbar pb-2 px-1" id="categoryChips">
+                    <button class="filter-chip active flex-shrink-0 px-4 py-1.5 rounded-full bg-primary text-white text-[11px] font-bold uppercase tracking-wider border border-primary shadow-[0_0_10px_rgba(139,92,246,0.3)] transition-all" data-type="All">All Data</button>
+                    <button class="filter-chip flex-shrink-0 px-4 py-1.5 rounded-full bg-white/5 text-slate-400 text-[11px] font-bold uppercase tracking-wider border border-transparent hover:bg-white/10 hover:text-slate-200 transition-all" data-type="Biases">Biases</button>
+                    <button class="filter-chip flex-shrink-0 px-4 py-1.5 rounded-full bg-white/5 text-slate-400 text-[11px] font-bold uppercase tracking-wider border border-transparent hover:bg-white/10 hover:text-slate-200 transition-all" data-type="Fallacies">Fallacies</button>
+                    <button class="filter-chip flex-shrink-0 px-4 py-1.5 rounded-full bg-white/5 text-slate-400 text-[11px] font-bold uppercase tracking-wider border border-transparent hover:bg-white/10 hover:text-slate-200 transition-all" data-type="Models">Mental Models</button>
+                </div>
+            </section>
+
+            <!-- Loading State -->
+            <div id="loadingIndicator" class="hidden flex-col items-center justify-center py-10 opacity-60">
+                <span class="material-icons-round text-primary animate-spin text-4xl mb-3">refresh</span>
+                <span class="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Querying Matrix...</span>
+            </div>
+
+            <!-- Feed / List (V3 SciFi Glass Cards) -->
+            <section class="space-y-4" id="feedContainer">
+                <!-- Javascript will populate this -->
+            </section>
+
+        </main>
+        
+        <!-- Bottom Blur Gradient to fade text underneath bottom Nav -->
+        <div class="fixed bottom-0 left-0 w-full h-24 bg-gradient-to-t from-background-dark to-transparent pointer-events-none z-40"></div>
     </div>
 
-    <div class="tabs">
-        <div class="tab active" onclick="filterType('All')">All</div>
-        <div class="tab" onclick="filterType('Bias')">Biases</div>
-        <div class="tab" onclick="filterType('Fallacy')">Fallacies</div>
-        <div class="tab" onclick="filterType('Mental Model')">Mental Models</div>
-    </div>
-
-    <div class="item-list" id="itemList">
-        <!-- Javascript will populate this -->
-    </div>
-
-    <div class="bottom-nav">
-        <div class="nav-item active" title="Home">🏠</div>
-        <div class="nav-item" title="Favorites">❤️</div>
-        <div class="nav-item" title="Settings">⚙️</div>
-    </div>
-
+    <!-- "Nano Banana" Logic (Vanilla JS) -->
     <script>
-        let allData = [];
+        const API_BASE = "http://127.0.0.1:8000";
+        let apiOnline = false;
+        
+        // State
         let currentFilter = 'All';
+        let searchQuery = '';
+        let allItems = []; // Combines all 3 types for 'All' view
 
-        // Load Data
-        async function loadData() {
+        // Elements
+        const feedContainer = document.getElementById('feedContainer');
+        const searchInput = document.getElementById('searchInput');
+        const hudStat = document.getElementById('hudStat');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        /**
+         * 1. Initialize & Check Health
+         */
+        async function checkHealth() {
             try {
-                const [biasesRes, fallaciesRes, modelsRes] = await Promise.all([
-                    fetch('biases.json'),
-                    fetch('fallacies.json'),
-                    fetch('mental_models.json')
-                ]);
-
-                const biases = await biasesRes.json();
-                const fallacies = await fallaciesRes.json();
-                const models = await modelsRes.json();
-
-                // Normalize Data Structure
-                allData = [
-                    ...biases.map(b => ({
-                        type: 'Bias',
-                        name: b.name,
-                        subtitle: b.category,
-                        description: `Category: ${b.category} > ${b.subcategory}`,
-                        url: b.url,
-                        fullDetails: `External Link: <a href="${b.url}" target="_blank" style="color: #8b5cf6;">${b.url}</a>`
-                    })),
-                    ...fallacies.map(f => ({
-                        type: 'Fallacy',
-                        name: f.name,
-                        subtitle: 'Logical Fallacy',
-                        description: f.description,
-                        fullDetails: `<strong>Logical Form:</strong> ${f.logical_form || 'N/A'}<br><br><strong>Example:</strong> ${f.explanation_with_examples || 'N/A'}`
-                    })),
-                    ...models.map(m => ({
-                        type: 'Mental Model',
-                        name: m.name,
-                        subtitle: m.category,
-                        description: m.description,
-                        fullDetails: `<strong>Example:</strong> ${m.example || 'N/A'}`
-                    }))
-                ];
-
-                renderList();
-
-            } catch (error) {
-                console.error("Error loading data:", error);
-                document.getElementById('itemList').innerHTML = `<div class='card' style='color:red;'>Error loading data. Make sure you serve this via a local server (e.g. python -m http.server).</div>`;
+                const res = await fetch(`${API_BASE}/health`);
+                if(res.ok) {
+                    apiOnline = true;
+                    const data = await res.json();
+                    hudStat.innerHTML = `<span class="text-primary">${data.biases + data.fallacies + data.models}</span> Nodes`;
+                    loadAllData();
+                } else {
+                    hudStat.innerText = "API Offline";
+                    showOfflineMockup();
+                }
+            } catch (e) {
+                apiOnline = false;
+                hudStat.innerText = "API Offline";
+                showOfflineMockup();
             }
         }
 
-        // Render List based on Search and Filter
-        function renderList() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const listContainer = document.getElementById('itemList');
-            listContainer.innerHTML = '';
+        /**
+         * 2. Fetch Data
+         */
+        async function loadAllData() {
+            showLoading(true);
+            try {
+                // Fetch paginated data (size=50 for initial feed)
+                const [biasesRes, fallaciesRes, modelsRes] = await Promise.all([
+                    fetch(`${API_BASE}/biases/search?size=50`),
+                    fetch(`${API_BASE}/fallacies/search?size=50`),
+                    fetch(`${API_BASE}/models/search?size=50`)
+                ]);
 
-            const filtered = allData.filter(item => {
-                const matchesType = currentFilter === 'All' || item.type === currentFilter;
-                const matchesSearch = item.name.toLowerCase().includes(query) ||
-                    (item.description && item.description.toLowerCase().includes(query));
-                return matchesType && matchesSearch;
+                const biasesData = await biasesRes.json();
+                const fallaciesData = await fallaciesRes.json();
+                const modelsData = await modelsRes.json();
+
+                // Normalize mapping
+                const mapBiases = biasesData.items.map(b => ({
+                    id: b.id, type: 'Bias', title: b.name, category: b.category, subcategory: b.subcategory, desc: '', url: b.url, color: 'text-primary', bg: 'bg-primary/20', border: 'border-primary/20'
+                }));
+                const mapFallacies = fallaciesData.items.map(f => ({
+                    id: f.name, type: 'Fallacy', title: f.name, category: 'Logic Error', subcategory: '', desc: f.description, url: null, color: 'text-rose-400', bg: 'bg-rose-500/20', border: 'border-rose-500/20'
+                }));
+                const mapModels = modelsData.items.map(m => ({
+                    id: m.name, type: 'Model', title: m.name, category: m.category || 'Framework', subcategory: '', desc: m.description, example: m.example, url: null, color: 'text-emerald-400', bg: 'bg-emerald-500/20', border: 'border-emerald-500/20'
+                }));
+
+                allItems = [...mapBiases, ...mapFallacies, ...mapModels];
+                // Shuffle for a mixed feed feel
+                allItems.sort(() => 0.5 - Math.random());
+                
+                renderFeed();
+            } catch(e) {
+                console.error("Failed to fetch API data", e);
+                feedContainer.innerHTML = `<div class="p-5 text-center text-red-400 font-mono text-sm border border-red-900/50 rounded-lg bg-red-900/10">Error fetching Matrix Data.<br>${e.message}</div>`;
+            }
+            showLoading(false);
+        }
+
+        /**
+         * 3. Render Feed (Glass Cards)
+         */
+        function renderFeed() {
+            feedContainer.innerHTML = '';
+            
+            // Filter
+            const list = allItems.filter(item => {
+                const matchType = currentFilter === 'All' || 
+                                  (currentFilter === 'Biases' && item.type === 'Bias') ||
+                                  (currentFilter === 'Fallacies' && item.type === 'Fallacy') ||
+                                  (currentFilter === 'Models' && item.type === 'Model');
+                
+                const query = searchQuery.toLowerCase();
+                const matchSearch = item.title.toLowerCase().includes(query) || 
+                                    (item.category && item.category.toLowerCase().includes(query)) ||
+                                    (item.desc && item.desc.toLowerCase().includes(query));
+                
+                return matchType && matchSearch;
             });
 
-            filtered.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'card';
+            if(list.length === 0) {
+                feedContainer.innerHTML = `<div class="p-8 text-center text-slate-500 font-mono text-xs">No relative nodes found in sector.</div>`;
+                return;
+            }
+
+            // Cap display to prevent mobile lag
+            const displayList = list.slice(0, 30);
+
+            displayList.forEach(item => {
+                const card = document.createElement('article');
+                card.className = 'glass-card rounded-xl p-5 relative overflow-hidden group cursor-pointer';
+                card.onclick = (e) => toggleDetails(card, item, e);
+                
+                const cardType = item.type.toUpperCase();
+                
                 card.innerHTML = `
-                    <div class="card-title">${item.name}</div>
-                    <div class="card-subtitle">[${item.type}] ${item.subtitle}</div>
-                    <div class="card-description" style="font-size: 0.9em; color: #ccc;">${item.description ? item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '') : ''}</div>
-                    <div class="card-details">${item.fullDetails}</div>
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <div class="flex items-center space-x-2 mb-1.5">
+                                <span class="px-2 py-0.5 rounded text-[9px] uppercase font-mono tracking-widest ${item.bg} ${item.color} ${item.border}">${cardType}</span>
+                                <span class="text-[9px] text-slate-500 font-mono uppercase tracking-widest">${item.category || item.type}</span>
+                            </div>
+                            <h3 class="text-[17px] font-bold text-white group-hover:text-primary transition-colors tracking-tight leading-snug">${item.title}</h3>
+                        </div>
+                    </div>
+                    
+                    ${item.subcategory ? `<div class="text-[10px] text-primary mb-2 opacity-80 uppercase tracking-widest">[ ${item.subcategory} ]</div>` : ''}
+                    
+                    <p class="text-[13px] text-slate-400 line-clamp-2 leading-relaxed preview-text">
+                        ${item.desc || 'Click to initiate neural-link and fetch deep Wikipedia metrics for this node.'}
+                    </p>
+                    
+                    <!-- Expandable Details Wrapper -->
+                    <div class="details-wrapper">
+                        <div class="pt-4 mt-3 border-t border-white/5 space-y-3 details-content">
+                            <!-- Dynamic content injected here via /concept ID fetch -->
+                        </div>
+                    </div>
                 `;
+                feedContainer.appendChild(card);
+            });
+        }
 
-                card.onclick = () => {
-                    item.expanded = !item.expanded;
-                    if (item.expanded) {
-                        card.classList.add('expanded');
-                    } else {
-                        card.classList.remove('expanded');
+        /**
+         * 4. Interaction Logic
+         */
+        async function toggleDetails(cardEl, item, e) {
+            const isExpanded = cardEl.classList.contains('expanded');
+            
+            // Close others
+            document.querySelectorAll('.glass-card.expanded').forEach(el => {
+                if(el !== cardEl) el.classList.remove('expanded');
+            });
+            
+            if (!isExpanded) {
+                cardEl.classList.add('expanded');
+                const detailsContainer = cardEl.querySelector('.details-content');
+                const previewText = cardEl.querySelector('.preview-text');
+                
+                // Fetch deep data from /concept API if needed
+                if (!item.deepLoaded && apiOnline) {
+                    detailsContainer.innerHTML = `<div class="flex items-center space-x-2 text-[10px] text-primary"><span class="material-icons-round animate-spin text-sm">rotate_right</span><span>Uplinking to Wikipedia...</span></div>`;
+                    try {
+                        const res = await fetch(`${API_BASE}/concept/${encodeURIComponent(item.title)}`);
+                        if(res.ok) {
+                            const detailData = await res.json();
+                            item.deepLoaded = true;
+                            item.fullDetail = detailData;
+                            
+                            // Remove preview clamp
+                            previewText.classList.remove('line-clamp-2');
+                            
+                            // Inject Rich Data
+                            let injectedHTML = '';
+                            if (detailData.wiki_summary) {
+                                injectedHTML += `<div class="p-3 rounded-lg bg-black/30 border border-white/5 text-[13px] text-slate-300 leading-relaxed"><span class="block text-[9px] uppercase tracking-widest text-slate-500 mb-1 font-mono">Wiki Summary</span>${detailData.wiki_summary.replace('[CACHED] ', '')}</div>`;
+                            }
+                            if (detailData.explanation_with_examples) {
+                                injectedHTML += `<div class="text-[13px] text-slate-300"><span class="block text-[9px] uppercase tracking-widest text-slate-500 mb-1 font-mono">Context</span>${detailData.explanation_with_examples}</div>`;
+                            }
+                            if (detailData.logical_form) {
+                                injectedHTML += `<div class="font-mono text-[11px] text-rose-300 bg-rose-500/10 p-2 rounded">${detailData.logical_form}</div>`;
+                            }
+                            if (detailData.example) {
+                                injectedHTML += `<div class="text-[13px] text-slate-300 italic">" ${detailData.example} "</div>`;
+                            }
+                            if (detailData.url) {
+                                injectedHTML += `<a href="${detailData.url}" target="_blank" class="inline-flex items-center space-x-1 text-[11px] font-mono text-secondary hover:text-white transition-colors mt-2"><span>Acess Source Databank</span><span class="material-icons-round text-sm">open_in_new</span></a>`;
+                            }
+                            
+                            detailsContainer.innerHTML = injectedHTML;
+                        } else {
+                            detailsContainer.innerHTML = `<span class="text-xs text-slate-500">Record missing from deeper databanks.</span>`;
+                        }
+                    } catch(err) {
+                        detailsContainer.innerHTML = `<span class="text-xs text-red-500">Link failed.</span>`;
                     }
-                };
-
-                listContainer.appendChild(card);
-            });
-        }
-
-        // Event Listeners
-        document.getElementById('searchInput').addEventListener('input', renderList);
-
-        function filterType(type) {
-            currentFilter = type;
-            // Update UI tabs
-            document.querySelectorAll('.tab').forEach(t => {
-                t.classList.remove('active');
-                if (t.innerText.includes(type) || (type === 'All' && t.innerText === 'All')) {
-                    t.classList.add('active');
+                } else {
+                     previewText.classList.remove('line-clamp-2');
                 }
-            });
-            renderList();
+            } else {
+                cardEl.classList.remove('expanded');
+                setTimeout(() => cardEl.querySelector('.preview-text').classList.add('line-clamp-2'), 300);
+            }
         }
 
-        // Search Bar Focus Effect (Optional)
-        const searchInput = document.getElementById('searchInput');
-        searchInput.addEventListener('focus', () => {
-            document.querySelector('.search-container').style.transform = 'scale(1.02)';
-        });
-        searchInput.addEventListener('blur', () => {
-            document.querySelector('.search-container').style.transform = 'scale(1)';
+        // Search Listener
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            renderFeed();
         });
 
-        // Initialize
-        loadData();
+        // Chip Listeners
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                // Style Active
+                document.querySelectorAll('.filter-chip').forEach(c => {
+                    c.classList.remove('active', 'bg-primary', 'text-white', 'shadow-[0_0_10px_rgba(139,92,246,0.3)]', 'border-primary');
+                    c.classList.add('bg-white/5', 'text-slate-400', 'border-transparent');
+                });
+                const t = e.target;
+                t.classList.remove('bg-white/5', 'text-slate-400', 'border-transparent');
+                t.classList.add('active', 'bg-primary', 'text-white', 'shadow-[0_0_10px_rgba(139,92,246,0.3)]', 'border-primary');
+                
+                currentFilter = t.dataset.type;
+                renderFeed();
+            });
+        });
+
+        // Utils
+        function showLoading(show) {
+            loadingIndicator.style.display = show ? 'flex' : 'none';
+        }
+
+        function showOfflineMockup() {
+            feedContainer.innerHTML = `
+                <div class="glass-card p-6 text-center">
+                    <span class="material-icons-round text-red-400 text-4xl mb-3">cloud_off</span>
+                    <h3 class="text-lg font-bold text-white mb-2">Matrix Link Severed</h3>
+                    <p class="text-sm text-slate-400">Please start the FastAPI backend on port 8000 to enable data streaming.</p>
+                    <code class="block mt-4 p-2 bg-black/50 text-emerald-400 font-mono text-xs rounded border border-white/5">uvicorn main:app --port 8000</code>
+                </div>
+            `;
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', checkHealth);
 
     </script>
 </body>
-
 </html>

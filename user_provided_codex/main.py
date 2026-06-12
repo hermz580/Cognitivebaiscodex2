@@ -1,212 +1,339 @@
+"""
+Cognitive Bias Codex — Unified Server v2.0
+==========================================
+This single file serves TWO clients simultaneously:
+
+  1. REST API  (FastAPI)  — web frontends, curl, browsers
+     GET /biases/search?term=...&page=1&size=20
+     GET /biases/{id}
+     GET /fallacies/search?term=...
+     GET /fallacies/{name}
+     GET /models/search?term=...
+     GET /models/{name}
+     GET /concept/{name}        <- unified search across all 3 databases
+     GET /health
+     GET /metrics               <- Prometheus
+
+  2. MCP  (FastMCP over HTTP)   — Claude Desktop, AI agents
+     Mounted at /mcp/
+     All tools: list_biases, get_bias_details, get_bias_context,
+                search_biases, get_categories,
+                list_fallacies, get_fallacy_details, search_fallacies,
+                list_mental_models, get_mental_model_details,
+                get_concept_details
+
+  3. STDIO mode — run directly for Claude Desktop with stdio transport:
+     python main.py          (uses stdio, no HTTP server)
+
+Usage:
+  HTTP server:  uvicorn main:app --reload --port 8000
+  MCP stdio:    python main.py
+"""
+
 import csv
+import hashlib
+import json
+import logging
 import os
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import httpx
-from typing import List, Dict, Any, Optional
+import uvicorn
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from mcp.server.fastmcp import FastMCP
+from prometheus_fastapi_instrumentator import Instrumentator
+from pydantic import BaseModel, Field
 
-# Initialize FastMCP server
-mcp = FastMCP("CognitiveBiasCodex")
+# ─────────────────────────────────────────────
+# Logging
+# ─────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("codex-unified")
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "bias.csv")
+# ─────────────────────────────────────────────
+# Paths  (all relative to this file's directory)
+# ─────────────────────────────────────────────
+BASE_DIR        = Path(__file__).parent
+BIAS_CSV        = BASE_DIR / "bias.csv"
+BIASES_JSON     = BASE_DIR / "biases.json"
+FALLACIES_JSON  = BASE_DIR / "fallacies.json"
+MODELS_JSON     = BASE_DIR / "mental_models.json"
+CACHE_DIR       = BASE_DIR / "cache"
 
-def load_data():
-    biases = []
-    if not os.path.exists(DATA_FILE):
+CACHE_DIR.mkdir(exist_ok=True)
+
+# ─────────────────────────────────────────────
+# In-memory caches
+# ─────────────────────────────────────────────
+_biases:    List[dict] = []
+_fallacies: List[dict] = []
+_models:    List[dict] = []
+
+
+# ─────────────────────────────────────────────
+# Data Loaders
+# ─────────────────────────────────────────────
+
+def load_biases() -> List[dict]:
+    """Load biases from bias.csv (hierarchical ID format)."""
+    global _biases
+    if _biases:
+        return _biases
+
+    if not BIAS_CSV.exists():
+        logger.warning(f"bias.csv not found at {BIAS_CSV}")
         return []
-        
-    with open(DATA_FILE, mode='r', encoding='utf-8') as f:
+
+    result = []
+    with open(BIAS_CSV, mode="r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            b_id = row.get('id', '')
-            if not b_id or b_id == 'bias':
+            b_id = row.get("id", "").strip()
+            if not b_id or b_id == "bias":
                 continue
-            
-            parts = b_id.split('.')
-            # parts[0] is always 'bias'
-            category = parts[1] if len(parts) > 1 else ""
+            parts = b_id.split(".")
+            category    = parts[1] if len(parts) > 1 else ""
             subcategory = parts[2] if len(parts) > 2 else ""
-            
-            # The name is the last part
-            name = parts[-1]
-            url = row.get('value', '').strip()
-            
-            biases.append({
-                "id": b_id,
-                "category": category,
+            name        = parts[-1]
+            url         = row.get("value", "").strip()
+            result.append({
+                "id":          b_id,
+                "name":        name,
+                "category":    category,
                 "subcategory": subcategory,
-                "name": name,
-                "url": url,
-                "is_leaf": bool(url)
+                "url":         url,
+                "is_leaf":     bool(url),
             })
-    return biases
+
+    _biases = result
+    logger.info(f"Loaded {len(_biases)} bias entries from CSV.")
+    return _biases
+
+
+def load_fallacies() -> List[dict]:
+    global _fallacies
+    if _fallacies:
+        return _fallacies
+    if not FALLACIES_JSON.exists():
+        logger.warning(f"fallacies.json not found at {FALLACIES_JSON}")
+        return []
+    try:
+        content = FALLACIES_JSON.read_text(encoding="utf-8").strip()
+        _fallacies = json.loads(content) if content.startswith("[") else [
+            json.loads(line) for line in content.splitlines() if line.strip()
+        ]
+        logger.info(f"Loaded {len(_fallacies)} fallacies.")
+        return _fallacies
+    except Exception as e:
+        logger.error(f"Failed to load fallacies.json: {e}")
+        return []
+
+
+def load_models() -> List[dict]:
+    global _models
+    if _models:
+        return _models
+    if not MODELS_JSON.exists():
+        logger.warning(f"mental_models.json not found at {MODELS_JSON}")
+        return []
+    try:
+        _models = json.loads(MODELS_JSON.read_text(encoding="utf-8"))
+        logger.info(f"Loaded {len(_models)} mental models.")
+        return _models
+    except Exception as e:
+        logger.error(f"Failed to load mental_models.json: {e}")
+        return []
+
+
+# ─────────────────────────────────────────────
+# Wikipedia Enrichment + File Cache
+# ─────────────────────────────────────────────
+
+def _cache_path(url: str) -> Path:
+    h = hashlib.md5(url.encode("utf-8")).hexdigest()
+    return CACHE_DIR / f"{h}.txt"
+
+
+def get_cached(url: str) -> Optional[str]:
+    p = _cache_path(url)
+    if p.exists():
+        try:
+            return p.read_text(encoding="utf-8")
+        except Exception:
+            return None
+    return None
+
+
+def save_cached(url: str, content: str):
+    try:
+        _cache_path(url).write_text(content, encoding="utf-8")
+    except Exception as e:
+        logger.error(f"Cache write failed: {e}")
+
+
+async def fetch_wikipedia(title_or_url: str) -> Optional[str]:
+    if not title_or_url:
+        return None
+    title = title_or_url.split("/wiki/")[-1] if "wikipedia" in title_or_url else title_or_url.split("/")[-1]
+    api_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
+    cached = get_cached(api_url)
+    if cached:
+        return f"[CACHED] {cached}"
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get(api_url, headers={
+                "User-Agent": "CognitiveBiasCodexMCP/2.0 (https://github.com/hermz580/Cognitivebaiscodex2)"
+            })
+            if resp.status_code == 200:
+                extract = resp.json().get("extract", "")
+                save_cached(api_url, extract)
+                return extract
+            logger.warning(f"Wikipedia returned {resp.status_code} for {title}")
+            return None
+    except Exception as e:
+        logger.error(f"Wikipedia fetch error: {e}")
+        return None
+
+
+# ─────────────────────────────────────────────
+# Pydantic Models (REST API)
+# ─────────────────────────────────────────────
+
+class BiasItem(BaseModel):
+    id:          str
+    name:        str
+    category:    str
+    subcategory: str
+    url:         str
+    wiki_summary: Optional[str] = None
+
+
+class FallacyItem(BaseModel):
+    name:        str
+    description: Optional[str] = None
+    logical_form: Optional[str] = None
+    explanation_with_examples: Optional[str] = None
+
+
+class ModelItem(BaseModel):
+    name:        str
+    category:    Optional[str] = None
+    description: Optional[str] = None
+    example:     Optional[str] = None
+
+
+class PaginatedBiases(BaseModel):
+    items:       List[BiasItem]
+    page:        int
+    size:        int
+    total:       int
+    total_pages: int
+
+
+# ─────────────────────────────────────────────
+# FastMCP — AI / Claude Desktop Tools
+# ─────────────────────────────────────────────
+
+mcp = FastMCP(
+    "CognitiveBiasCodex",
+    instructions=(
+        "This server provides a comprehensive database of cognitive biases, "
+        "logical fallacies, and mental models. Use get_concept_details() for "
+        "a unified search. Use get_bias_context() for live Wikipedia summaries."
+    ),
+)
+
+
+# ── Bias Tools ──
 
 @mcp.tool()
 def list_biases(category: Optional[str] = None) -> List[str]:
-    """
-    List all cognitive biases. 
-    Optionally filter by category.
-    """
-    data = load_data()
-    results = []
+    """List all cognitive biases, optionally filtered by category."""
+    data = load_biases()
+    names = set()
     for b in data:
-        if b['is_leaf']:
-            if category:
-                if category.lower() in b['category'].lower():
-                    results.append(b['name'])
-            else:
-                results.append(b['name'])
-    return sorted(list(set(results)))
+        if not b["is_leaf"]:
+            continue
+        if category and category.lower() not in b["category"].lower():
+            continue
+        names.add(b["name"])
+    return sorted(names)
+
 
 @mcp.tool()
 def get_bias_details(name: str) -> str:
-    """
-    Get the category, subcategory, and reference URL for a specific cognitive bias.
-    """
-    data = load_data()
-    for b in data:
-        if b['name'].lower() == name.lower() and b['is_leaf']:
-            res = f"Bias: {b['name']}\n"
-            res += f"Category: {b['category']}\n"
-            res += f"Subcategory: {b['subcategory']}\n"
-            res += f"Reference: {b['url']}"
-            return res
+    """Get category, subcategory, and reference URL for a specific cognitive bias."""
+    for b in load_biases():
+        if b["name"].lower() == name.lower() and b["is_leaf"]:
+            return (
+                f"Bias: {b['name']}\n"
+                f"Category: {b['category']}\n"
+                f"Subcategory: {b['subcategory']}\n"
+                f"Reference: {b['url']}"
+            )
     return f"Bias '{name}' not found."
+
 
 @mcp.tool()
 async def get_bias_context(name: str) -> str:
-    """
-    Fetch a summary or content for a cognitive bias from its reference URL.
-    This works for Wikipedia links and general web pages.
-    Now includes caching to speed up repeated requests.
-    """
-    bias = None
-    data = load_data()
-    for b in data:
-        if b['name'].lower() == name.lower() and b['is_leaf']:
-            bias = b
-            break
-    
-    if not bias:
-        return f"Bias '{name}' not found."
-    
-    url = bias['url']
-    if not url:
-        return f"No URL available for '{name}'."
+    """Fetch live Wikipedia summary for a cognitive bias (cached after first call)."""
+    for b in load_biases():
+        if b["name"].lower() == name.lower() and b["is_leaf"]:
+            if not b["url"]:
+                return f"No URL available for '{name}'."
+            summary = await fetch_wikipedia(b["url"])
+            return summary or f"Could not fetch Wikipedia summary for '{name}'."
+    return f"Bias '{name}' not found."
 
-    # Check Cache
-    cached = get_cached_content(url)
-    if cached:
-        return f"[CACHED] {cached}"
-    
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        try:
-            content_to_save = ""
-            # Special handling for Wikipedia
-            if "wikipedia.org" in url:
-                title = url.split("/wiki/")[-1]
-                api_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
-                # Wikipedia API requires a User-Agent
-                headers = {
-                    "User-Agent": "CognitiveBiasCodexMCP/1.0 (https://github.com/mootpoots94-jpg/Cognitivebaiscodex)"
-                }
-                resp = await client.get(api_url, headers=headers)
-                resp.raise_for_status()
-                wiki_data = resp.json()
-                content_to_save = f"Source: Wikipedia\n\n{wiki_data.get('extract', 'No summary available.')}"
-            
-            # General scraping for other sites
-            else:
-                resp = await client.get(url, headers={"User-Agent": "CognitiveBiasCodexMCP/1.0"})
-                resp.raise_for_status()
-                
-                try:
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(resp.text, 'html.parser')
-                    
-                    # Try to find the main content
-                    content = ""
-                    article = soup.find('article') or soup.find('main') or soup.find('div', class_='content')
-                    
-                    if article:
-                        paragraphs = article.find_all('p')
-                    else:
-                        paragraphs = soup.find_all('p')
-                    
-                    count = 0
-                    for p in paragraphs:
-                        text = p.get_text().strip()
-                        if len(text) > 50:
-                            content += text + "\n\n"
-                            count += 1
-                        if count >= 3:
-                            break
-                            
-                    if not content:
-                        content_to_save = f"Source: {url}\n\nCould not extract main content. Please visit the link directly."
-                    else:
-                        content_to_save = f"Source: {url}\n\n{content}"
-                    
-                except ImportError:
-                    return f"Source: {url}\n\nBeautifulSoup not installed. Cannot scrape content."
-                except Exception as scrape_err:
-                    return f"Source: {url}\n\nError parsing content: {str(scrape_err)}"
-
-            # Save to Cache
-            save_cached_content(url, content_to_save)
-            return content_to_save
-
-        except Exception as e:
-            return f"Error fetching content from {url}: {str(e)}"
 
 @mcp.tool()
 def search_biases(query: str) -> List[Dict[str, str]]:
-    """
-    Search for biases matching a query string in their name or category.
-    """
-    data = load_data()
-    results = []
-    for b in data:
-        if b['is_leaf'] and (query.lower() in b['name'].lower() or query.lower() in b['category'].lower()):
-            results.append({
-                "name": b['name'],
-                "category": b['category'],
-                "url": b['url']
-            })
-    return results
+    """Search for cognitive biases matching a query in name or category."""
+    q = query.lower()
+    return [
+        {"name": b["name"], "category": b["category"], "url": b["url"]}
+        for b in load_biases()
+        if b["is_leaf"] and (q in b["name"].lower() or q in b["category"].lower())
+    ]
+
 
 @mcp.tool()
 def get_categories() -> Dict[str, List[str]]:
-    """
-    Get all categories and their associated sub-themes.
-    """
-    data = load_data()
-    cats = {}
-    for b in data:
-        cat = b['category']
-        if not cat: continue
+    """Get all bias categories and their subcategories."""
+    cats: Dict[str, set] = {}
+    for b in load_biases():
+        cat = b["category"]
+        if not cat:
+            continue
         if cat not in cats:
             cats[cat] = set()
-        if b['subcategory']:
-            cats[cat].add(b['subcategory'])
-    
-    return {k: sorted(list(v)) for k, v in cats.items()}
+        if b["subcategory"]:
+            cats[cat].add(b["subcategory"])
+    return {k: sorted(v) for k, v in cats.items()}
+
 
 @mcp.resource("cognitive-bias://full-codex")
 def get_full_codex() -> str:
-    """Returns the full hierarchical data of the cognitive bias codex in Markdown format."""
-    data = load_data()
-    output = "# Cognitive Bias Codex\n\n"
-    
-    tree = {}
-    for b in data:
-        cat = b['category']
-        sub = b['subcategory']
-        if not cat: continue
-        if cat not in tree: tree[cat] = {}
-        if sub not in tree[cat]: tree[cat][sub] = []
-        if b['is_leaf']:
+    """Returns the full hierarchical bias codex as Markdown."""
+    tree: Dict[str, Dict[str, list]] = {}
+    for b in load_biases():
+        if not b["category"]:
+            continue
+        cat = b["category"]
+        sub = b["subcategory"]
+        tree.setdefault(cat, {}).setdefault(sub, [])
+        if b["is_leaf"]:
             tree[cat][sub].append(b)
-            
+
+    output = "# Cognitive Bias Codex\n\n"
     for cat, subs in tree.items():
         output += f"## {cat}\n"
         for sub, biases in subs.items():
@@ -218,153 +345,314 @@ def get_full_codex() -> str:
     return output
 
 
-
-FALLACIES_FILE = os.path.join(os.path.dirname(__file__), "fallacies.json")
-
-def load_fallacies():
-    if not os.path.exists(FALLACIES_FILE):
-        return []
-    try:
-        import json
-        with open(FALLACIES_FILE, 'r', encoding='utf-8') as f:
-            # Handle potential JSONL format or standard JSON
-            content = f.read().strip()
-            if content.startswith('['):
-                return json.loads(content)
-            else:
-                # Assume JSONL
-                return [json.loads(line) for line in content.split('\n') if line.strip()]
-    except Exception as e:
-        print(f"Error loading fallacies: {e}")
-        return []
+# ── Fallacy Tools ──
 
 @mcp.tool()
 def list_fallacies() -> List[str]:
-    """
-    List all logical fallacies available in the database.
-    """
-    data = load_fallacies()
-    return sorted([f.get('name') for f in data if f.get('name')])
+    """List all logical fallacies in the database."""
+    return sorted(f.get("name", "") for f in load_fallacies() if f.get("name"))
+
 
 @mcp.tool()
 def get_fallacy_details(name: str) -> str:
-    """
-    Get the description, logical form, and examples for a specific logical fallacy.
-    """
-    data = load_fallacies()
-    for f in data:
-        if f.get('name').lower() == name.lower():
-            res = f"Fallacy: {f.get('name')}\n"
-            res += f"Description: {f.get('description')}\n"
-            if f.get('logical_form'):
-                res += f"Logical Form: {f.get('logical_form')}\n"
-            if f.get('explanation_with_examples'):
-                res += f"\nExamples:\n{f.get('explanation_with_examples')}"
-            return res
+    """Get description, logical form, and examples for a specific logical fallacy."""
+    for f in load_fallacies():
+        if f.get("name", "").lower() == name.lower():
+            result = f"Fallacy: {f.get('name')}\n"
+            result += f"Description: {f.get('description', 'N/A')}\n"
+            if f.get("logical_form"):
+                result += f"Logical Form: {f['logical_form']}\n"
+            if f.get("explanation_with_examples"):
+                result += f"\nExamples:\n{f['explanation_with_examples']}"
+            return result
     return f"Fallacy '{name}' not found."
+
 
 @mcp.tool()
 def search_fallacies(query: str) -> List[Dict[str, str]]:
-    """
-    Search for logical fallacies matching a query in their name or description.
-    """
-    data = load_fallacies()
-    results = []
-    for f in data:
-        name = f.get('name', '')
-        desc = f.get('description', '')
-        if query.lower() in name.lower() or query.lower() in desc.lower():
-            results.append({
-                "name": name,
-                "description": desc[:100] + "..." if len(desc) > 100 else desc
-            })
-    return results
+    """Search for logical fallacies matching a query in name or description."""
+    q = query.lower()
+    return [
+        {
+            "name": f.get("name", ""),
+            "description": (f.get("description", "")[:120] + "...") if len(f.get("description", "")) > 120 else f.get("description", ""),
+        }
+        for f in load_fallacies()
+        if q in f.get("name", "").lower() or q in f.get("description", "").lower()
+    ]
 
-MENTAL_MODELS_FILE = os.path.join(os.path.dirname(__file__), "mental_models.json")
-CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
 
-if not os.path.exists(CACHE_DIR):
-    os.makedirs(CACHE_DIR)
-
-def load_mental_models():
-    if not os.path.exists(MENTAL_MODELS_FILE):
-        return []
-    try:
-        import json
-        with open(MENTAL_MODELS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Error loading mental models: {e}")
-        return []
-
-def get_cached_content(url: str) -> Optional[str]:
-    import hashlib
-    url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
-    cache_path = os.path.join(CACHE_DIR, url_hash + ".txt")
-    if os.path.exists(cache_path):
-        try:
-            with open(cache_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        except:
-            return None
-    return None
-
-def save_cached_content(url: str, content: str):
-    import hashlib
-    try:
-        url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
-        cache_path = os.path.join(CACHE_DIR, url_hash + ".txt")
-        with open(cache_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-    except Exception as e:
-        print(f"Error saving cache: {e}")
+# ── Mental Model Tools ──
 
 @mcp.tool()
 def list_mental_models() -> List[str]:
-    """
-    List all Mental Models available in the database.
-    """
-    data = load_mental_models()
-    return sorted([m.get('name') for m in data if m.get('name')])
+    """List all mental models in the database."""
+    return sorted(m.get("name", "") for m in load_models() if m.get("name"))
+
 
 @mcp.tool()
 def get_mental_model_details(name: str) -> str:
-    """
-    Get the description and example for a specific Mental Model.
-    """
-    data = load_mental_models()
-    for m in data:
-        if m.get('name').lower() == name.lower():
-            res = f"Mental Model: {m.get('name')}\n"
-            res += f"Category: {m.get('category')}\n"
-            res += f"Description: {m.get('description')}\n"
-            res += f"Example: {m.get('example')}"
-            return res
+    """Get description and example for a specific mental model."""
+    for m in load_models():
+        if m.get("name", "").lower() == name.lower():
+            return (
+                f"Mental Model: {m.get('name')}\n"
+                f"Category: {m.get('category', 'N/A')}\n"
+                f"Description: {m.get('description', 'N/A')}\n"
+                f"Example: {m.get('example', 'N/A')}"
+            )
     return f"Mental Model '{name}' not found."
+
+
+@mcp.tool()
+def search_mental_models(query: str) -> List[Dict[str, str]]:
+    """Search mental models by name or description."""
+    q = query.lower()
+    return [
+        {"name": m.get("name", ""), "category": m.get("category", ""), "description": m.get("description", "")[:100]}
+        for m in load_models()
+        if q in m.get("name", "").lower() or q in m.get("description", "").lower()
+    ]
+
+
+# ── Unified Search Tool ──
 
 @mcp.tool()
 def get_concept_details(concept_name: str) -> str:
     """
-    Unified search tool that checks Biases, Fallacies, and Mental Models for a given concept name.
+    Unified search across ALL databases: Biases, Fallacies, and Mental Models.
+    Returns the first match found with its type label.
     """
-    # Check Bias
-    bias_details = get_bias_details(concept_name)
-    if "not found" not in bias_details:
-        return f"[Type: Cognitive Bias]\n{bias_details}"
+    bias = get_bias_details(concept_name)
+    if "not found" not in bias:
+        return f"[Type: Cognitive Bias]\n{bias}"
 
-    # Check Fallacy
-    fallacy_details = get_fallacy_details(concept_name)
-    if "not found" not in fallacy_details:
-        return f"[Type: Logical Fallacy]\n{fallacy_details}"
+    fallacy = get_fallacy_details(concept_name)
+    if "not found" not in fallacy:
+        return f"[Type: Logical Fallacy]\n{fallacy}"
 
-    # Check Mental Model
-    model_details = get_mental_model_details(concept_name)
-    if "not found" not in model_details:
-        return f"[Type: Mental Model]\n{model_details}"
+    model = get_mental_model_details(concept_name)
+    if "not found" not in model:
+        return f"[Type: Mental Model]\n{model}"
 
-    return f"Concept '{concept_name}' not found in any database (Biases, Fallacies, Mental Models)."
+    return f"'{concept_name}' not found in Biases, Fallacies, or Mental Models."
+
+
+# ─────────────────────────────────────────────
+# FastAPI App + Lifespan
+# ─────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting Cognitive Bias Codex Unified Server...")
+    load_biases()
+    load_fallacies()
+    load_models()
+    logger.info("All databases loaded and cached.")
+    yield
+    logger.info("Shutting down.")
+
+
+app = FastAPI(
+    title="Cognitive Bias Codex — Unified API",
+    description=__doc__,
+    version="2.0.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount MCP server at /mcp for HTTP AI clients (Claude, etc.)
+try:
+    mcp_app = mcp.streamable_http_app()
+    app.mount("/mcp", mcp_app)
+    logger.info("FastMCP mounted at /mcp")
+except Exception as e:
+    logger.warning(f"Could not mount MCP over HTTP: {e}. Stdio-only mode available.")
+
+# Prometheus metrics
+Instrumentator().instrument(app).expose(app)
+
+
+# ─────────────────────────────────────────────
+# REST Endpoints — Biases
+# ─────────────────────────────────────────────
+
+@app.get("/biases/search", response_model=PaginatedBiases, tags=["Biases"])
+async def search_biases_rest(
+    term:   Optional[str] = Query(None,  description="Search in name or category"),
+    category: Optional[str] = Query(None, description="Filter by exact category"),
+    page:   int            = Query(1,    ge=1),
+    size:   int            = Query(20,   ge=1, le=100),
+    enrich: bool           = Query(False, description="Fetch live Wikipedia summaries"),
+):
+    """Search biases with optional enrichment and pagination."""
+    data = [b for b in load_biases() if b["is_leaf"]]
+
+    if category:
+        data = [b for b in data if category.lower() in b["category"].lower()]
+    if term:
+        t = term.lower()
+        data = [b for b in data if t in b["name"].lower() or t in b["category"].lower()]
+
+    total = len(data)
+    total_pages = max(1, (total + size - 1) // size)
+    page_items = data[(page - 1) * size: page * size]
+
+    items = []
+    for b in page_items:
+        wiki = None
+        if enrich:
+            wiki = await fetch_wikipedia(b["url"] or b["name"])
+        items.append(BiasItem(
+            id=b["id"], name=b["name"], category=b["category"],
+            subcategory=b["subcategory"], url=b["url"], wiki_summary=wiki,
+        ))
+
+    return PaginatedBiases(items=items, page=page, size=size, total=total, total_pages=total_pages)
+
+
+@app.get("/biases/{bias_id}", response_model=BiasItem, tags=["Biases"])
+async def get_bias_rest(bias_id: str):
+    """Get a single bias by ID with auto Wikipedia enrichment."""
+    rec = next((b for b in load_biases() if b["id"] == bias_id), None)
+    if not rec:
+        raise HTTPException(status_code=404, detail=f"Bias '{bias_id}' not found.")
+    wiki = await fetch_wikipedia(rec["url"] or rec["name"])
+    return BiasItem(**{k: rec[k] for k in ["id", "name", "category", "subcategory", "url"]}, wiki_summary=wiki)
+
+
+# ─────────────────────────────────────────────
+# REST Endpoints — Fallacies
+# ─────────────────────────────────────────────
+
+@app.get("/fallacies/search", tags=["Fallacies"])
+async def search_fallacies_rest(
+    term: Optional[str] = Query(None, description="Search in name or description"),
+    page: int           = Query(1,  ge=1),
+    size: int           = Query(20, ge=1, le=100),
+):
+    """Search logical fallacies with pagination."""
+    data = load_fallacies()
+    if term:
+        t = term.lower()
+        data = [f for f in data if t in f.get("name", "").lower() or t in f.get("description", "").lower()]
+    total = len(data)
+    total_pages = max(1, (total + size - 1) // size)
+    page_items = data[(page - 1) * size: page * size]
+    return {"items": page_items, "page": page, "size": size, "total": total, "total_pages": total_pages}
+
+
+@app.get("/fallacies/{name}", tags=["Fallacies"])
+async def get_fallacy_rest(name: str):
+    """Get a single fallacy by name."""
+    rec = next((f for f in load_fallacies() if f.get("name", "").lower() == name.lower()), None)
+    if not rec:
+        raise HTTPException(status_code=404, detail=f"Fallacy '{name}' not found.")
+    return rec
+
+
+# ─────────────────────────────────────────────
+# REST Endpoints — Mental Models
+# ─────────────────────────────────────────────
+
+@app.get("/models/search", tags=["Mental Models"])
+async def search_models_rest(
+    term: Optional[str] = Query(None, description="Search in name or description"),
+    page: int           = Query(1,  ge=1),
+    size: int           = Query(20, ge=1, le=100),
+):
+    """Search mental models with pagination."""
+    data = load_models()
+    if term:
+        t = term.lower()
+        data = [m for m in data if t in m.get("name", "").lower() or t in m.get("description", "").lower()]
+    total = len(data)
+    total_pages = max(1, (total + size - 1) // size)
+    page_items = data[(page - 1) * size: page * size]
+    return {"items": page_items, "page": page, "size": size, "total": total, "total_pages": total_pages}
+
+
+@app.get("/models/{name}", tags=["Mental Models"])
+async def get_model_rest(name: str):
+    """Get a single mental model by name."""
+    rec = next((m for m in load_models() if m.get("name", "").lower() == name.lower()), None)
+    if not rec:
+        raise HTTPException(status_code=404, detail=f"Mental Model '{name}' not found.")
+    return rec
+
+
+# ─────────────────────────────────────────────
+# REST Endpoint — Unified Concept Search
+# ─────────────────────────────────────────────
+
+@app.get("/concept/{concept_name}", tags=["Unified"])
+async def get_concept_rest(concept_name: str):
+    """
+    Search across all three databases: Biases, Fallacies, Mental Models.
+    Returns the first match found with its type.
+    """
+    # Check biases
+    bias = next(
+        (b for b in load_biases() if b["name"].lower() == concept_name.lower() and b["is_leaf"]),
+        None,
+    )
+    if bias:
+        wiki = await fetch_wikipedia(bias["url"] or bias["name"])
+        return {"type": "Cognitive Bias", **bias, "wiki_summary": wiki}
+
+    # Check fallacies
+    fallacy = next(
+        (f for f in load_fallacies() if f.get("name", "").lower() == concept_name.lower()),
+        None,
+    )
+    if fallacy:
+        return {"type": "Logical Fallacy", **fallacy}
+
+    # Check mental models
+    model = next(
+        (m for m in load_models() if m.get("name", "").lower() == concept_name.lower()),
+        None,
+    )
+    if model:
+        return {"type": "Mental Model", **model}
+
+    raise HTTPException(status_code=404, detail=f"'{concept_name}' not found in any database.")
+
+
+# ─────────────────────────────────────────────
+# Health Check
+# ─────────────────────────────────────────────
+
+@app.get("/health", tags=["System"])
+def health():
+    return {
+        "status": "ok",
+        "biases":    len(_biases),
+        "fallacies": len(_fallacies),
+        "models":    len(_models),
+        "cache_dir": str(CACHE_DIR),
+        "mcp_tools": len(mcp._tool_manager._tools) if hasattr(mcp, "_tool_manager") else "n/a",
+    }
+
+
+# ─────────────────────────────────────────────
+# Entrypoints
+# ─────────────────────────────────────────────
 
 if __name__ == "__main__":
-    mcp.run()
-
-
+    import sys
+    if "--http" in sys.argv:
+        # HTTP server mode:  python main.py --http
+        uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    else:
+        # Default: stdio MCP mode for Claude Desktop
+        mcp.run()
